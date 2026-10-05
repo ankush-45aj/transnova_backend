@@ -7,6 +7,8 @@ const pinoHttp = require("pino-http");
 
 const authRoutes = require("./modules/auth/auth.routes");
 const transactionRoutes = require("./modules/transactions/transaction.routes");
+const walletRoutes = require("./modules/wallets/wallet.routes");
+const offrampRoutes = require("./modules/offramp/offramp.routes");
 
 const app = express();
 
@@ -19,6 +21,8 @@ app.use(rateLimit({ windowMs: 15 * 60 * 1000, limit: 300, standardHeaders: true,
 app.get("/health", (_request, response) => response.status(200).json({ status: "ok" }));
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/transactions", transactionRoutes);
+app.use("/api/v1/wallets", walletRoutes);
+app.use("/api/v1/offramp", offrampRoutes);
 
 app.use((error, _request, response, _next) => {
   const status = error.statusCode || 500;
