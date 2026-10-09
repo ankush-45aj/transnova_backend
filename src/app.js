@@ -9,6 +9,7 @@ const authRoutes = require("./modules/auth/auth.routes");
 const transactionRoutes = require("./modules/transactions/transaction.routes");
 const walletRoutes = require("./modules/wallets/wallet.routes");
 const offrampRoutes = require("./modules/offramp/offramp.routes");
+const devTokenRoutes = require("./modules/auth/dev-token.routes");
 
 const app = express();
 
@@ -23,6 +24,10 @@ app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/transactions", transactionRoutes);
 app.use("/api/v1/wallets", walletRoutes);
 app.use("/api/v1/offramp", offrampRoutes);
+// DEV ONLY — remove or comment out before production
+if (process.env.NODE_ENV !== "production") {
+  app.use("/api/v1/dev", devTokenRoutes);
+}
 
 app.use((error, _request, response, _next) => {
   const status = error.statusCode || 500;

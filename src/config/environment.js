@@ -11,6 +11,7 @@ const environment = {
   circleWalletSetId: process.env.CIRCLE_WALLET_SET_ID,
   crossmintApiKey: process.env.CROSSMINT_API_KEY,
   crossmintBaseUrl: process.env.CROSSMINT_BASE_URL || "https://staging.crossmint.com",
+  firebaseWebApiKey: process.env.FIREBASE_WEB_API_KEY,
 };
 
 module.exports = environment;
