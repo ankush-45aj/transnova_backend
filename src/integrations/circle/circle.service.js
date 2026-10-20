@@ -61,6 +61,7 @@ class CircleService {
   async getWalletTokenBalance(walletId) {
     const client = getCircleClient();
     const response = await client.getWalletTokenBalance({
+      id: walletId,
       walletId,
       includeAll: true,
     });
@@ -107,11 +108,14 @@ class CircleService {
    */
   async estimateTransferFee({ walletId, tokenId, destinationAddress, amounts }) {
     const client = getCircleClient();
+    const amountArray = Array.isArray(amounts) ? amounts.map(String) : [String(amounts)];
     const response = await client.estimateTransferFee({
+      id: walletId,
       walletId,
       tokenId,
       destinationAddress,
-      amounts: Array.isArray(amounts) ? amounts.map(String) : [String(amounts)],
+      amount: amountArray,
+      amounts: amountArray,
     });
     return response.data || response;
   }

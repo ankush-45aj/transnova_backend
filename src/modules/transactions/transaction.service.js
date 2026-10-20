@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const mongoose = require("mongoose");
 const Transaction = require("./transaction.model");
 const Wallet = require("../wallets/wallet.model");
 const circleService = require("../../integrations/circle/circle.service");
@@ -22,19 +23,36 @@ class TransactionService {
       throw error;
     }
 
-    // 2. Obtain internal USDC token UUID
-    const tokenId = await circleService.extractUsdcTokenId(walletId);
+    // 2. Resolve wallet and obtain internal USDC token UUID
+    let wallet = null;
+    if (mongoose.Types.ObjectId.isValid(walletId)) {
+      wallet = await Wallet.findOne({ _id: walletId, user: userId });
+    }
+    if (!wallet) {
+      wallet = await Wallet.findOne({
+        $or: [
+          { circleWalletId: walletId },
+          { providerWalletId: walletId },
+          { address: walletId },
+          { circleAddress: walletId },
+        ],
+        user: userId,
+      });
+    }
+
+    const targetCircleWalletId = wallet ? (wallet.circleWalletId || wallet.providerWalletId) : walletId;
+    const tokenId = await circleService.extractUsdcTokenId(targetCircleWalletId);
 
     // 3. Estimate transfer fee
     const feeEstimation = await circleService.estimateTransferFee({
-      walletId,
+      walletId: targetCircleWalletId,
       tokenId,
       destinationAddress,
       amounts: [amount],
     });
 
     return {
-      walletId,
+      walletId: targetCircleWalletId,
       destinationAddress,
       amount,
       feeEstimation,
@@ -60,9 +78,20 @@ class TransactionService {
     }
 
     // 2. Verify wallet ownership and obtain internal USDC token UUID
-    let wallet = await Wallet.findOne({ _id: walletId, user: userId });
+    let wallet = null;
+    if (mongoose.Types.ObjectId.isValid(walletId)) {
+      wallet = await Wallet.findOne({ _id: walletId, user: userId });
+    }
     if (!wallet) {
-      wallet = await Wallet.findOne({ circleWalletId: walletId, user: userId });
+      wallet = await Wallet.findOne({
+        $or: [
+          { circleWalletId: walletId },
+          { providerWalletId: walletId },
+          { address: walletId },
+          { circleAddress: walletId },
+        ],
+        user: userId,
+      });
     }
 
     const targetCircleWalletId = wallet ? (wallet.circleWalletId || wallet.providerWalletId) : walletId;

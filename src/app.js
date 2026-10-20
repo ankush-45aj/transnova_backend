@@ -30,6 +30,7 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 app.use((error, _request, response, _next) => {
+  console.error("Unhandled error:", error.message || error);
   const status = error.statusCode || 500;
   response.status(status).json({ message: error.message || "Internal server error" });
 });

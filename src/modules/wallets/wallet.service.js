@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const User = require("../users/user.model");
 const Wallet = require("./wallet.model");
 const circleService = require("../../integrations/circle/circle.service");
@@ -53,14 +54,22 @@ class WalletService {
    * Get wallet token balances and USDC internal token UUID from Circle.
    */
   async getWalletBalance(walletId, userId) {
-    let wallet = await Wallet.findOne({
-      _id: walletId,
-      user: userId,
-    });
+    let wallet = null;
+    if (mongoose.Types.ObjectId.isValid(walletId)) {
+      wallet = await Wallet.findOne({
+        _id: walletId,
+        user: userId,
+      });
+    }
 
     if (!wallet) {
       wallet = await Wallet.findOne({
-        circleWalletId: walletId,
+        $or: [
+          { circleWalletId: walletId },
+          { providerWalletId: walletId },
+          { address: walletId },
+          { circleAddress: walletId },
+        ],
         user: userId,
       });
     }
