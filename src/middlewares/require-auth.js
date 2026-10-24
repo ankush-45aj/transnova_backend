@@ -12,10 +12,11 @@ const requireAuth = async (request, _response, next) => {
     initializeFirebase();
     request.auth = await admin.auth().verifyIdToken(header.slice(7));
     return next();
-  } catch (_error) {
-    const error = new Error("Invalid or expired Firebase ID token.");
-    error.statusCode = 401;
-    return next(error);
+  } catch (error) {
+    console.error("Auth verification failed:", error.message || error);
+    const authError = new Error("Invalid or expired Firebase ID token.");
+    authError.statusCode = 401;
+    return next(authError);
   }
 };
 

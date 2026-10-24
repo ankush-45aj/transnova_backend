@@ -8,7 +8,7 @@ const connectDatabase = async () => {
     console.log("MongoDB connected successfully");
   } catch (error) {
     console.error("MongoDB connection failed:", error.message);
-    process.exit(1);
+    console.warn("⚠️  Server starting without DB — DB-backed routes will fail until MongoDB is reachable.");
   }
 };
 

@@ -1,8 +1,9 @@
-const admin = require("firebase-admin");
+const { initializeApp, getApps, cert } = require("firebase-admin/app");
+const { getAuth } = require("firebase-admin/auth");
 const environment = require("./environment");
 
 const initializeFirebase = () => {
-  if (admin.apps.length) return admin.app();
+  if (getApps().length) return getApps()[0];
 
   if (!environment.firebaseServiceAccountJson) {
     throw new Error("FIREBASE_SERVICE_ACCOUNT_JSON is required to verify Firebase ID tokens.");
@@ -15,7 +16,18 @@ const initializeFirebase = () => {
     throw new Error("FIREBASE_SERVICE_ACCOUNT_JSON must contain valid JSON.");
   }
 
-  return admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+  if (serviceAccount && serviceAccount.private_key) {
+    serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, "\n");
+  }
+
+  return initializeApp({ credential: cert(serviceAccount) });
 };
 
-module.exports = { admin, initializeFirebase };
+const admin = {
+  auth: () => {
+    initializeFirebase();
+    return getAuth();
+  },
+};
+
+module.exports = { admin, initializeFirebase, getAuth };
