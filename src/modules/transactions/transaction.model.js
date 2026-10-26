@@ -24,6 +24,8 @@ const transactionSchema = new mongoose.Schema(
     crossmintPaymentMethodId: { type: String },
     crossmintOrderId: { type: String, sparse: true, index: true },
     crossmintStatus: { type: String },
+    transakOrderId: { type: String, sparse: true, index: true },
+    transakStatus: { type: String },
     error: { type: mongoose.Schema.Types.Mixed },
     metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
   },
