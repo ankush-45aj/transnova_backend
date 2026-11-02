@@ -4,7 +4,7 @@ const environment = require("../../config/environment");
 
 /**
  * Circle Provider Service
- * Encapuslates direct interactions with Circle Developer-Controlled Wallets API.
+ * Encapsulates direct interactions with Circle Developer-Controlled Wallets API.
  */
 class CircleService {
   /**
@@ -61,7 +61,6 @@ class CircleService {
   async getWalletTokenBalance(walletId) {
     const client = getCircleClient();
     const response = await client.getWalletTokenBalance({
-      id: walletId,
       walletId,
       includeAll: true,
     });
@@ -110,11 +109,9 @@ class CircleService {
     const client = getCircleClient();
     const amountArray = Array.isArray(amounts) ? amounts.map(String) : [String(amounts)];
     const response = await client.estimateTransferFee({
-      id: walletId,
       walletId,
       tokenId,
       destinationAddress,
-      amount: amountArray,
       amounts: amountArray,
     });
     return response.data || response;
