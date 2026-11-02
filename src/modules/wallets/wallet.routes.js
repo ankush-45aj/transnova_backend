@@ -9,6 +9,7 @@ const router = express.Router();
 const createWalletSchema = z.object({
   blockchain: z.string().trim().default("MATIC-AMOY"),
   accountType: z.string().trim().default("SCA"),
+  forceNew: z.boolean().optional().default(false),
 });
 
 const validateAddressSchema = z.object({
@@ -31,6 +32,7 @@ router.post("/circle", requireAuth, async (request, response, next) => {
     const wallet = await walletService.createCircleWallet(user._id, {
       blockchains: [input.blockchain],
       accountType: input.accountType,
+      forceNew: input.forceNew,
     });
 
     return response.status(201).json({

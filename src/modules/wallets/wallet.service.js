@@ -16,11 +16,11 @@ class WalletService {
     }
 
     // Check if user already has an active Circle wallet on this blockchain
-    const blockchain = options.blockchains?.[0] || "MATIC-AMOY";
+    const blockchain = options.blockchains?.[0] || options.blockchain || "MATIC-AMOY";
     const existingWallet = await Wallet.findOne({
       user: userId,
       provider: "circle",
-      circleWalletId: { $exists: true },
+      blockchain: blockchain,
       status: "active",
     });
 
@@ -74,10 +74,16 @@ class WalletService {
       });
     }
 
-    const targetCircleWalletId = wallet ? (wallet.circleWalletId || wallet.providerWalletId) : walletId;
-    if (!targetCircleWalletId) {
-      const error = new Error("Wallet not found or not associated with a Circle wallet ID.");
+    if (!wallet) {
+      const error = new Error("Wallet not found or you do not have permission to view its balance.");
       error.statusCode = 404;
+      throw error;
+    }
+
+    const targetCircleWalletId = wallet.circleWalletId || wallet.providerWalletId;
+    if (!targetCircleWalletId) {
+      const error = new Error("Wallet is not associated with an active Circle wallet ID.");
+      error.statusCode = 400;
       throw error;
     }
 
