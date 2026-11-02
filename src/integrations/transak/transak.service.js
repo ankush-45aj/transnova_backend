@@ -70,9 +70,14 @@ const verifyWebhookData = async (token) => {
   }
 
   const now = Math.floor(Date.now() / 1000);
-  if ((claims.exp !== undefined && (typeof claims.exp !== "number" || now >= claims.exp))
-    || (claims.nbf !== undefined && (typeof claims.nbf !== "number" || now < claims.nbf))) {
-    const error = new Error("Expired or not-yet-valid Transak webhook.");
+  // Replay & Expiration protection: exp must be present and valid
+  if (!claims.exp || typeof claims.exp !== "number" || now >= claims.exp) {
+    const error = new Error("Expired or missing expiration timestamp on Transak webhook.");
+    error.statusCode = 401;
+    throw error;
+  }
+  if (claims.nbf !== undefined && (typeof claims.nbf !== "number" || now < claims.nbf)) {
+    const error = new Error("Not-yet-valid Transak webhook.");
     error.statusCode = 401;
     throw error;
   }
