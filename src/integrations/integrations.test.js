@@ -147,6 +147,34 @@ describe("Circle & Crossmint Integration Tests", () => {
       expect(response.status).toBe(201);
       expect(response.body.transaction).toBeDefined();
     });
+
+    test("POST /api/v1/transactions/circle-transfer rejects if wallet is not owned by user", async () => {
+      circleService.validateAddress.mockResolvedValue({ isValid: true });
+      Wallet.findOne.mockResolvedValue(null);
+
+      const response = await request(app)
+        .post("/api/v1/transactions/circle-transfer")
+        .set("Authorization", "Bearer valid-token")
+        .send({
+          walletId: "unowned-wallet-id",
+          destinationAddress: "0x1234567890abcdef1234567890abcdef12345678",
+          amount: 50.0,
+        });
+
+      expect(response.status).toBe(404);
+      expect(response.body.message).toMatch(/not found or you do not have permission/i);
+    });
+
+    test("GET /api/v1/transactions/circle/:circleTransactionId rejects if not owned by user", async () => {
+      Transaction.findOne.mockResolvedValue(null);
+
+      const response = await request(app)
+        .get("/api/v1/transactions/circle/circle-tx-999")
+        .set("Authorization", "Bearer valid-token");
+
+      expect(response.status).toBe(404);
+      expect(response.body.message).toMatch(/not found or you do not have permission/i);
+    });
   });
 
   describe("Crossmint Off-ramp Routes", () => {
