@@ -112,7 +112,8 @@ router.post("/simulate", requireAuth, async (request, response, next) => {
       type: input.type,
       amount: input.amount.toString(),
       asset: input.asset,
-      status: "completed",
+      status: "simulated",
+      isSimulation: true,
       metadata: { simulation: true, destinationWalletAddress: input.destinationWalletAddress },
     });
     return response.status(201).json({ transaction, message: "Simulated transaction only. No money or stablecoin was transferred." });
@@ -129,7 +130,14 @@ router.get("/", requireAuth, async (request, response, next) => {
   try {
     const user = await User.findOne({ firebaseUid: request.auth.uid });
     if (!user) return response.status(200).json({ transactions: [] });
-    const transactions = await Transaction.find({ user: user._id }).sort({ createdAt: -1 });
+
+    const includeSimulated = request.query.includeSimulated === "true";
+    const filter = { user: user._id };
+    if (!includeSimulated) {
+      filter.isSimulation = { $ne: true };
+    }
+
+    const transactions = await Transaction.find(filter).sort({ createdAt: -1 });
     return response.status(200).json({ transactions });
   } catch (error) { return next(error); }
 });

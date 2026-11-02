@@ -40,7 +40,19 @@ class TransactionService {
       });
     }
 
-    const targetCircleWalletId = wallet ? (wallet.circleWalletId || wallet.providerWalletId) : walletId;
+    if (!wallet) {
+      const error = new Error("Wallet not found or you do not have permission to access it.");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const targetCircleWalletId = wallet.circleWalletId || wallet.providerWalletId;
+    if (!targetCircleWalletId) {
+      const error = new Error("Wallet is not associated with an active Circle wallet ID.");
+      error.statusCode = 400;
+      throw error;
+    }
+
     const tokenId = await circleService.extractUsdcTokenId(targetCircleWalletId);
 
     // 3. Estimate transfer fee
@@ -94,8 +106,38 @@ class TransactionService {
       });
     }
 
-    const targetCircleWalletId = wallet ? (wallet.circleWalletId || wallet.providerWalletId) : walletId;
+    if (!wallet) {
+      const error = new Error("Wallet not found or you do not have permission to access it.");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const targetCircleWalletId = wallet.circleWalletId || wallet.providerWalletId;
+    if (!targetCircleWalletId) {
+      const error = new Error("Wallet is not associated with an active Circle wallet ID.");
+      error.statusCode = 400;
+      throw error;
+    }
+
     const tokenId = await circleService.extractUsdcTokenId(targetCircleWalletId);
+
+    // 2b. Pre-transfer balance check to prevent creating doomed failed records
+    const balances = await circleService.getWalletTokenBalance(targetCircleWalletId);
+    if (Array.isArray(balances)) {
+      for (const b of balances) {
+        const symbol = b.token?.symbol || b.symbol;
+        const amountVal = b.amount !== undefined ? b.amount : b.token?.amount;
+        if (symbol === "USDC" && amountVal !== undefined) {
+          const availableAmount = Number(amountVal);
+          if (Number.isFinite(availableAmount) && availableAmount < Number(amount)) {
+            const error = new Error(`Insufficient USDC balance. Required: ${amount}, Available: ${availableAmount}`);
+            error.statusCode = 400;
+            throw error;
+          }
+          break;
+        }
+      }
+    }
 
     // 3. Create transaction record in database
     const transaction = await Transaction.create({
@@ -147,31 +189,38 @@ class TransactionService {
    * Get Circle transaction status and update application transaction state.
    */
   async getCircleTransactionStatus(circleTransactionId, userId) {
+    if (!userId) {
+      const error = new Error("User ID is required to fetch transaction status.");
+      error.statusCode = 401;
+      throw error;
+    }
+
+    // Security check: verify transaction ownership in local database first
+    const transaction = await Transaction.findOne({ circleTransactionId, user: userId });
+    if (!transaction) {
+      const error = new Error("Transaction not found or you do not have permission to view it.");
+      error.statusCode = 404;
+      throw error;
+    }
+
     const statusResult = await circleService.getTransactionStatus(circleTransactionId);
     const { state, txHash } = statusResult;
 
-    const query = { circleTransactionId };
-    if (userId) query.user = userId;
-
-    let transaction = await Transaction.findOne(query);
-
-    if (transaction) {
-      transaction.circleStatus = state;
-      if (txHash) {
-        transaction.circleTxHash = txHash;
-      }
-
-      // Only mark application transaction as completed when Circle confirms state === "COMPLETE" and txHash is available
-      if (state === "COMPLETE" && txHash) {
-        transaction.status = "completed";
-      } else if (state === "FAILED" || state === "CANCELLED") {
-        transaction.status = "failed";
-      } else {
-        transaction.status = "processing";
-      }
-
-      await transaction.save();
+    transaction.circleStatus = state;
+    if (txHash) {
+      transaction.circleTxHash = txHash;
     }
+
+    // Only mark application transaction as completed when Circle confirms state === "COMPLETE" and txHash is available
+    if (state === "COMPLETE" && txHash) {
+      transaction.status = "completed";
+    } else if (state === "FAILED" || state === "CANCELLED") {
+      transaction.status = "failed";
+    } else {
+      transaction.status = "processing";
+    }
+
+    await transaction.save();
 
     return {
       circleTransactionId,
