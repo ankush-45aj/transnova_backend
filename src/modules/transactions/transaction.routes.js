@@ -3,6 +3,7 @@ const express = require("express");
 const { z } = require("zod");
 const requireAuth = require("../../middlewares/require-auth");
 const User = require("../users/user.model");
+const Wallet = require("../wallets/wallet.model");
 const Transaction = require("./transaction.model");
 const transactionService = require("./transaction.service");
 
@@ -17,19 +18,27 @@ const createSchema = z.object({
 
 const estimateFeeSchema = z.object({
   walletId: z.string().trim().min(1, "walletId is required"),
-  destinationAddress: z.string().trim().min(1, "destinationAddress is required"),
+  destinationAddress: z.string().trim().optional(),
+  recipientEmail: z.string().trim().email().optional(),
   amount: z.coerce.number().positive("Amount must be greater than zero"),
-});
+}).refine(
+  (data) => Boolean(data.destinationAddress || data.recipientEmail),
+  { message: "Either destinationAddress (scanned QR code) or recipientEmail is required." }
+);
 
 const circleTransferSchema = z.object({
   walletId: z.string().trim().min(1, "walletId is required"),
-  destinationAddress: z.string().trim().min(1, "destinationAddress is required"),
+  destinationAddress: z.string().trim().optional(),
+  recipientEmail: z.string().trim().email().optional(),
   amount: z.coerce.number().positive("Amount must be greater than zero"),
-});
+}).refine(
+  (data) => Boolean(data.destinationAddress || data.recipientEmail),
+  { message: "Either destinationAddress (scanned QR code) or recipientEmail is required." }
+);
 
 /**
  * POST /api/v1/transactions/estimate-fee
- * Estimate transfer fee before executing Circle USDC transfer.
+ * Estimate transfer fee before executing Circle USDC transfer (via QR address or email).
  */
 router.post("/estimate-fee", requireAuth, async (request, response, next) => {
   try {
@@ -37,9 +46,22 @@ router.post("/estimate-fee", requireAuth, async (request, response, next) => {
     const user = await User.findOne({ firebaseUid: request.auth.uid });
     if (!user) return response.status(404).json({ message: "User profile not found. Call POST /auth/sync first." });
 
+    let targetAddress = input.destinationAddress;
+    if (!targetAddress && input.recipientEmail) {
+      const recipientUser = await User.findOne({ email: input.recipientEmail.toLowerCase() });
+      if (!recipientUser) {
+        return response.status(404).json({ message: `Recipient user with email ${input.recipientEmail} not found.` });
+      }
+      const recipientWallet = await Wallet.findOne({ user: recipientUser._id, provider: "circle", status: "active" });
+      if (!recipientWallet || (!recipientWallet.circleAddress && !recipientWallet.address)) {
+        return response.status(404).json({ message: "Recipient user has no active Circle wallet." });
+      }
+      targetAddress = recipientWallet.circleAddress || recipientWallet.address;
+    }
+
     const feeInfo = await transactionService.estimateFee({
       walletId: input.walletId,
-      destinationAddress: input.destinationAddress,
+      destinationAddress: targetAddress,
       amount: input.amount,
       userId: user._id,
     });
@@ -53,7 +75,7 @@ router.post("/estimate-fee", requireAuth, async (request, response, next) => {
 
 /**
  * POST /api/v1/transactions/circle-transfer
- * Execute Circle USDC transfer.
+ * Execute Circle USDC transfer (Flow 2: via scanned QR address or recipient email).
  */
 router.post("/circle-transfer", requireAuth, async (request, response, next) => {
   try {
@@ -61,9 +83,22 @@ router.post("/circle-transfer", requireAuth, async (request, response, next) => 
     const user = await User.findOne({ firebaseUid: request.auth.uid });
     if (!user) return response.status(404).json({ message: "User profile not found. Call POST /auth/sync first." });
 
+    let targetAddress = input.destinationAddress;
+    if (!targetAddress && input.recipientEmail) {
+      const recipientUser = await User.findOne({ email: input.recipientEmail.toLowerCase() });
+      if (!recipientUser) {
+        return response.status(404).json({ message: `Recipient user with email ${input.recipientEmail} not found.` });
+      }
+      const recipientWallet = await Wallet.findOne({ user: recipientUser._id, provider: "circle", status: "active" });
+      if (!recipientWallet || (!recipientWallet.circleAddress && !recipientWallet.address)) {
+        return response.status(404).json({ message: "Recipient user has no active Circle wallet." });
+      }
+      targetAddress = recipientWallet.circleAddress || recipientWallet.address;
+    }
+
     const transaction = await transactionService.executeCircleTransfer({
       walletId: input.walletId,
-      destinationAddress: input.destinationAddress,
+      destinationAddress: targetAddress,
       amount: input.amount,
       userId: user._id,
     });

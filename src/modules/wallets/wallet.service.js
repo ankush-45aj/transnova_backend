@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const QRCode = require("qrcode");
 const User = require("../users/user.model");
 const Wallet = require("./wallet.model");
 const circleService = require("../../integrations/circle/circle.service");
@@ -48,6 +49,71 @@ class WalletService {
     });
 
     return wallet;
+  }
+
+  /**
+   * Generate permanent QR code for a wallet's blockchain address.
+   */
+  async generateWalletQR(wallet) {
+    const address = wallet.circleAddress || wallet.address;
+    if (!address) {
+      const error = new Error("Wallet does not have an on-chain address.");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const qrPayload = address;
+    const paymentUri = `ethereum:${address}@80002?symbol=USDC`;
+    const qrCodeDataUrl = await QRCode.toDataURL(qrPayload, {
+      errorCorrectionLevel: "H",
+      margin: 2,
+      width: 320,
+      color: {
+        dark: "#000000",
+        light: "#FFFFFF",
+      },
+    });
+
+    return {
+      walletId: wallet._id,
+      circleWalletId: wallet.circleWalletId || wallet.providerWalletId,
+      address,
+      blockchain: wallet.blockchain || wallet.network || "MATIC-AMOY",
+      asset: wallet.asset || "USDC",
+      qrPayload,
+      paymentUri,
+      qrCodeDataUrl,
+    };
+  }
+
+  /**
+   * Get primary wallet and permanent QR code for a user.
+   */
+  async getUserPrimaryWallet(userId) {
+    let wallet = await Wallet.findOne({
+      user: userId,
+      provider: "circle",
+      status: "active",
+    });
+
+    if (!wallet) {
+      // Auto-provision if not yet created
+      try {
+        wallet = await this.createCircleWallet(userId, { blockchain: "MATIC-AMOY" });
+      } catch (err) {
+        console.warn("Could not auto-provision wallet in getUserPrimaryWallet:", err.message);
+      }
+    }
+
+    if (!wallet) {
+      return null;
+    }
+
+    const qr = await this.generateWalletQR(wallet);
+    return {
+      wallet,
+      qr,
+    };
   }
 
   /**

@@ -97,6 +97,26 @@ describe("Circle & Crossmint Integration Tests", () => {
       expect(response.status).toBe(200);
       expect(response.body.isValid).toBe(true);
     });
+
+    test("GET /api/v1/wallets/me returns primary wallet and QR code", async () => {
+      Wallet.findOne.mockResolvedValue({
+        _id: "mongo-wallet-1",
+        circleWalletId: "circle-wallet-123",
+        address: "0x1234567890abcdef1234567890abcdef12345678",
+        circleAddress: "0x1234567890abcdef1234567890abcdef12345678",
+        blockchain: "MATIC-AMOY",
+        status: "active",
+      });
+
+      const response = await request(app)
+        .get("/api/v1/wallets/me")
+        .set("Authorization", "Bearer valid-token");
+
+      expect(response.status).toBe(200);
+      expect(response.body.qr).toBeDefined();
+      expect(response.body.qr.qrCodeDataUrl).toMatch(/^data:image\/png;base64,/);
+      expect(response.body.qr.address).toBe("0x1234567890abcdef1234567890abcdef12345678");
+    });
   });
 
   describe("Circle Transaction Routes", () => {
