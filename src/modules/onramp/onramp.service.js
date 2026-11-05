@@ -16,7 +16,7 @@ const webhookStatus = {
 };
 
 class OnrampService {
-  async createWidgetOrder({ userId, walletId, fiatCurrency, fiatAmount, userIp }) {
+  async createWidgetOrder({ userId, walletId, fiatCurrency, fiatAmount, userIp, remittanceId }) {
     if (!net.isIP(userIp)) {
       const error = new Error("A valid client IP address is required to start a Transak session.");
       error.statusCode = 400;
@@ -72,6 +72,7 @@ class OnrampService {
       sourceCurrency: fiatCurrency,
       sourceAmount: String(fiatAmount),
       destinationCurrency: "USDC",
+      remittanceId: remittanceId || undefined,
       metadata: { network: environment.transakNetwork },
     });
 
@@ -118,6 +119,11 @@ class OnrampService {
       throw error;
     }
 
+    // Deduplication check: ignore replayed event IDs
+    if (transaction.processedWebhookEvents && transaction.processedWebhookEvents.includes(eventId)) {
+      return { received: true, duplicate: true };
+    }
+
     const isTerminal = ["completed", "failed", "cancelled"].includes(transaction.status);
     if (!isTerminal) {
       transaction.status = status;
@@ -133,7 +139,21 @@ class OnrampService {
         transaction.usdcAmount = String(webhookData.cryptoAmount);
         transaction.destinationAmount = String(webhookData.cryptoAmount);
       }
+      if (!transaction.processedWebhookEvents) {
+        transaction.processedWebhookEvents = [];
+      }
+      transaction.processedWebhookEvents.push(eventId);
       await transaction.save();
+
+      // Trigger multi-leg remittance progression if linked
+      if (status === "completed" && transaction.remittanceId) {
+        try {
+          const remittanceService = require("../remittance/remittance.service");
+          await remittanceService.onOnrampCompleted(transaction);
+        } catch (pipelineErr) {
+          console.error("Remittance pipeline progression error:", pipelineErr.message);
+        }
+      }
     }
 
     return { received: true };

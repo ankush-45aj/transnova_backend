@@ -72,6 +72,22 @@ router.post("/payment-methods", requireAuth, async (request, response, next) => 
 });
 
 /**
+ * GET /api/v1/offramp/payment-methods
+ * List saved payment methods for the authenticated user.
+ */
+router.get("/payment-methods", requireAuth, async (request, response, next) => {
+  try {
+    const user = await User.findOne({ firebaseUid: request.auth.uid });
+    if (!user) return response.status(404).json({ message: "User profile not found. Call POST /auth/sync first." });
+
+    const paymentMethods = await offrampService.getUserPaymentMethods(user._id);
+    return response.status(200).json({ paymentMethods });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/**
  * POST /api/v1/offramp/orders
  * Create Crossmint off-ramp order.
  */
@@ -99,6 +115,54 @@ router.post("/orders", requireAuth, async (request, response, next) => {
     });
   } catch (error) {
     if (error instanceof z.ZodError) error.statusCode = 400;
+    return next(error);
+  }
+});
+
+/**
+ * GET /api/v1/offramp/orders/:orderId
+ * Check and sync status for an off-ramp order from Crossmint.
+ */
+router.get("/orders/:orderId", requireAuth, async (request, response, next) => {
+  try {
+    const user = await User.findOne({ firebaseUid: request.auth.uid });
+    if (!user) return response.status(404).json({ message: "User profile not found. Call POST /auth/sync first." });
+
+    const result = await offrampService.getOfframpOrderStatus(request.params.orderId, user._id);
+    return response.status(200).json(result);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/**
+ * POST /api/v1/offramp/webhooks/crossmint
+ * Webhook endpoint for Crossmint order status updates.
+ */
+router.post("/webhooks/crossmint", async (request, response, next) => {
+  try {
+    const payload = request.body;
+    const orderId = payload?.orderId || payload?.id || payload?.data?.orderId;
+    const status = payload?.status || payload?.data?.status;
+
+    if (!orderId || !status) {
+      return response.status(400).json({ message: "Missing orderId or status in webhook payload." });
+    }
+
+    const Transaction = require("../transactions/transaction.model");
+    const transaction = await Transaction.findOne({ crossmintOrderId: orderId });
+    if (transaction) {
+      transaction.crossmintStatus = status;
+      if (status === "completed" || status === "success") {
+        transaction.status = "completed";
+      } else if (status === "failed" || status === "rejected") {
+        transaction.status = "failed";
+      }
+      await transaction.save();
+    }
+
+    return response.status(200).json({ received: true });
+  } catch (error) {
     return next(error);
   }
 });

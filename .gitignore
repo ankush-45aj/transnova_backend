@@ -1,2 +1,7 @@
 node_modules/
 .env
+*.dat
+*.pem
+*.key
+*entity_secret*
+recovery_file*

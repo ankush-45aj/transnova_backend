@@ -1,57 +1,100 @@
-# TransNova backend (v1 scaffold)
+# TransNova Backend
 
-This API uses Firebase Authentication for identity and MongoDB for TransNova application data. Demo transaction records are simulated; Circle wallet transfers and the Transak on-ramp use provider integrations.
+Secure, compliant cross-border remittance backend connecting local fiat payments (INR via UPI/IMPS) with stablecoin rails (USDC on Polygon) and US domestic banking payouts (ACH/FedNow).
 
-## API flow
+---
 
-1. Your frontend signs a user in with Firebase Authentication.
-2. The frontend gets a Firebase ID token and sends it as `Authorization: Bearer <ID_TOKEN>`.
-3. `POST /api/v1/auth/sync` verifies the token and creates/updates the MongoDB user plus one placeholder USDC wallet.
-4. Create a Circle wallet with `POST /api/v1/wallets/circle`.
-5. Start a Transak USDC purchase with `POST /api/v1/onramp/widget-url`; the API creates a user-owned pending transaction and returns a short-lived hosted widget URL.
-6. Transak order webhooks update the pending transaction. Only a verified `ORDER_COMPLETED` event marks it completed; the on-ramp does not automatically transfer the USDC to another wallet.
-7. Use `POST /api/v1/transactions/simulate` only to record a dummy transaction.
+## 1. End-to-End Remittance Flow
 
-## Endpoints
-
-| Method | Path | Purpose |
-| --- | --- | --- |
-| GET | `/health` | Health check |
-| POST | `/api/v1/auth/sync` | Create/update the user profile after Firebase sign-in |
-| GET | `/api/v1/auth/me` | Get the signed-in user profile |
-| POST | `/api/v1/transactions/simulate` | Create a clearly marked dummy transaction |
-| GET | `/api/v1/transactions` | List the signed-in user's transactions |
-| POST | `/api/v1/onramp/widget-url` | Create a Transak hosted on-ramp session for the user's Circle USDC wallet |
-| GET | `/api/v1/onramp/transactions/:transactionId` | Read one of the signed-in user's Transak on-ramp transactions |
-| POST | `/api/v1/onramp/webhooks/transak` | Receive and verify Transak order status webhooks |
-
-Example simulated transaction body:
-
-```json
-{ "type": "wallet_transfer", "amount": 25, "asset": "USDC", "destinationWalletAddress": "demo-recipient" }
+```
+[Sender, India]  pays INR (UPI/IMPS)
+      │
+[On-ramp]  INR → USDC  (Transak hosted widget, locked to user's Circle wallet)
+      │
+[Pipeline] Automated webhook triggers next leg on verified ORDER_COMPLETED
+      │
+[Chain]    USDC transfer on Polygon (Circle Developer-Controlled SCA Wallets)
+      │
+[Off-ramp] USDC → USD → Recipient US bank account (Crossmint ACH payout)
 ```
 
-## Firebase setup
+1. **Client Auth**: Frontend signs in via Firebase Authentication and includes `Authorization: Bearer <ID_TOKEN>`.
+2. **Profile & Wallet Setup**: `POST /api/v1/auth/sync` registers the user in MongoDB. `POST /api/v1/wallets/circle` provisions a developer-controlled smart contract wallet (SCA).
+3. **Recipient Setup**: `POST /api/v1/offramp/payment-methods` registers the beneficiary bank account. Raw sensitive banking details are transmitted directly to Crossmint; only non-sensitive metadata is stored locally.
+4. **Initiate Remittance**: `POST /api/v1/remittance/initiate` creates a multi-leg remittance order and returns a single-use Transak widget session locked to the user's wallet.
+5. **Automated Pipeline**: When Transak sends the HMAC-verified `ORDER_COMPLETED` webhook, the Remittance orchestrator automatically initiates the Crossmint off-ramp order.
+6. **Track Progress**: `GET /api/v1/remittance/:remittanceId` returns real-time status across all legs with an audit timeline.
 
-1. Create a project in the [Firebase Console](https://console.firebase.google.com/), then open **Build → Authentication → Get started**.
-2. Under **Sign-in method**, enable the provider you will use first (Email/Password is simplest for development).
-3. Open **Project settings → Service accounts**, choose **Node.js**, then click **Generate new private key**. Keep the downloaded JSON private.
-4. Copy `.env.example` to `.env`. Set `FIREBASE_SERVICE_ACCOUNT_JSON` to the complete service-account JSON on a single line. In PowerShell, a convenient option is `Get-Content service-account.json -Raw` and paste the output after the `=`.
-5. Your frontend must use the Firebase Web/Android/iOS SDK to sign the user in. After sign-in, call `user.getIdToken()` and attach that value as the Bearer token to every protected API request.
-6. Start MongoDB, then run `npm install` and `npm run dev`.
+---
 
-Firebase Admin verifies tokens; it does not accept email/password sign-in requests. That sign-in happens in the client with the Firebase client SDK.
+## 2. API Endpoints
 
-## Transak on-ramp setup
+| Module | Method | Path | Description |
+| :--- | :--- | :--- | :--- |
+| **System** | `GET` | `/health` | Server health check |
+| **Auth** | `POST` | `/api/v1/auth/sync` | Sync Firebase user profile to MongoDB |
+| | `GET` | `/api/v1/auth/me` | Fetch authenticated user profile & KYC status |
+| **Dev Helpers** *(Non-prod)* | `POST` | `/api/v1/dev/firebase-signup` | Create user and return ID token (requires `ENABLE_DEV_ROUTES=true`) |
+| | `POST` | `/api/v1/dev/firebase-token` | Sign in user and return ID token (requires `ENABLE_DEV_ROUTES=true`) |
+| **Wallets** | `POST` | `/api/v1/wallets/circle` | Create/provision Circle SCA wallet (`forceNew` supported) |
+| | `GET` | `/api/v1/wallets/:walletId/balance` | Query live balances from Circle SDK (ownership enforced) |
+| | `POST` | `/api/v1/wallets/validate-address` | Validate destination blockchain address |
+| **Transactions** | `POST` | `/api/v1/transactions/estimate-fee` | Estimate transfer fees (ownership enforced) |
+| | `POST` | `/api/v1/transactions/circle-transfer` | Execute on-chain USDC transfer (balance & ownership checked) |
+| | `GET` | `/api/v1/transactions/circle/:circleTransactionId` | Check and sync Circle transfer status (ownership enforced) |
+| | `POST` | `/api/v1/transactions/simulate` | Record simulated dummy transaction (`status: simulated`) |
+| | `GET` | `/api/v1/transactions` | List transaction history (`?includeSimulated=true` optional) |
+| **On-Ramp (Transak)** | `POST` | `/api/v1/onramp/widget-url` | Generate single-use widget session locked to user wallet |
+| | `GET` | `/api/v1/onramp/transactions/:transactionId` | View user on-ramp transaction |
+| | `POST` | `/api/v1/onramp/webhooks/transak` | HMAC signature verified & replay-protected webhook receiver |
+| **Off-Ramp (Crossmint)** | `POST` | `/api/v1/offramp/payment-methods` | Register ACH bank account beneficiary |
+| | `GET` | `/api/v1/offramp/payment-methods` | List authenticated user's saved payment methods |
+| | `POST` | `/api/v1/offramp/orders` | Create off-ramp payout order (ownership enforced) |
+| | `GET` | `/api/v1/offramp/orders/:orderId` | Live status sync with Crossmint |
+| | `POST` | `/api/v1/offramp/webhooks/crossmint` | Webhook receiver for order status events |
+| **Remittance Pipeline** | `POST` | `/api/v1/remittance/initiate` | Start orchestrated end-to-end cross-border remittance |
+| | `GET` | `/api/v1/remittance/:remittanceId` | Track end-to-end multi-leg status & timeline |
+| | `GET` | `/api/v1/remittance` | List user's remittance history |
 
-Set `TRANSAK_API_KEY` and `TRANSAK_API_SECRET` in the server environment; never put the API secret in frontend code or commit it. Use staging credentials with the staging API and gateway URLs shown in `.env.example`. Configure `CLIENT_ORIGIN` to the exact frontend origin, `TRANSAK_REFERRER_DOMAIN` to the domain registered with Transak, and the matching `TRANSAK_NETWORK` / `TRANSAK_CIRCLE_BLOCKCHAIN` values. The selected Circle wallet must belong to the authenticated user, be active, and be able to receive USDC on that configured network.
+---
 
-The endpoint requires a matching browser `Origin` and uses the request's client IP when creating the widget session. If deployed behind a reverse proxy, set `TRUST_PROXY` to the actual proxy hop count or trusted proxy IP/CIDR values so `request.ip` is the end-user IP; do not trust arbitrary forwarded headers. Register `POST /api/v1/onramp/webhooks/transak` with Transak. Webhook data is signature-verified with the Transak partner access token before transaction state is changed.
+## 3. Security & Reliability Highlights
 
-The widget URL is single-use and expires after five minutes. The backend records the requested fiat amount and destination wallet before creating the widget. Transak handles the payment and sends USDC to the locked wallet address; the receiver transfer is a separate operation. A completed on-ramp webhook is not, by itself, a reconciliation ledger or proof that a subsequent wallet transfer is safe.
+- **Strict User Ownership**: All wallet operations, balance lookups, fee estimations, transfer executions, and order queries verify that the target wallet and transactions belong to the requesting user.
+- **Pre-transfer Balance Verification**: Wallet balance is queried prior to dispatching transfers to Circle, preventing failed transaction pollution.
+- **Transak Webhook Replay Protection**: Strict `exp` timestamp validation combined with event ID deduplication (`processedWebhookEvents`) prevents replay attacks.
+- **Sensitive Data Privacy**: Raw bank account and routing numbers are sent directly to provider APIs and are never stored in cleartext in the database.
+- **Fail-Fast Database Boot**: Server refuses to start with an unreachable MongoDB connection in production.
+- **Dev Route Isolation**: Non-production token endpoints require an explicit `ENABLE_DEV_ROUTES=true` environment flag.
+- **Sanitized Error Responses**: Internal stack traces, database exceptions, and third-party API errors are stripped from production 500 responses.
 
-Before production, complete Transak's partner security checklist and static egress IP allowlisting, add idempotency and ledger/balance reconciliation, implement KYC/AML and sanctions workflows, use managed secrets, and review applicable regulations. Do not store private wallet keys in this API.
+---
 
-## Production notes
+## 4. Setup & Running
 
-Before handling real stablecoin flows, add idempotency and ledger/balance reconciliation, complete KYC/AML and sanctions workflows, use managed secrets, and review applicable regulations. Do not store private wallet keys in this API.
+```bash
+# 1. Install dependencies
+npm install
+
+# 2. Configure environment
+cp .env.example .env
+# Fill in MONGO_URI, FIREBASE_SERVICE_ACCOUNT_JSON, CIRCLE_*, CROSSMINT_*, TRANSAK_*
+
+# 3. Run automated tests
+npm test
+
+# 4. Start development server
+npm run dev
+```
+
+---
+
+## 5. Regulatory & Compliance Framework
+
+- **India (RBI / FEMA / PMLA)**:
+  - Outward retail remittances operate under the Liberalised Remittance Scheme (LRS).
+  - Virtual Digital Asset (VDA) operations must adhere to FIU-IND reporting obligations and PMLA rules.
+  - Remittances require Form A2 declaration and TCS compliance above applicable thresholds.
+- **United States (FinCEN / State MSB)**:
+  - Payouts via US domestic rails (ACH/FedNow) require operating under licensed Money Transmitter / MSB partners (e.g. Crossmint / Bridge).
+  - Originator and beneficiary verification adheres to the FATF Travel Rule.
