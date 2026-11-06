@@ -97,6 +97,26 @@ describe("Circle & Crossmint Integration Tests", () => {
       expect(response.status).toBe(200);
       expect(response.body.isValid).toBe(true);
     });
+
+    test("GET /api/v1/wallets/me returns primary wallet and QR code", async () => {
+      Wallet.findOne.mockResolvedValue({
+        _id: "mongo-wallet-1",
+        circleWalletId: "circle-wallet-123",
+        address: "0x1234567890abcdef1234567890abcdef12345678",
+        circleAddress: "0x1234567890abcdef1234567890abcdef12345678",
+        blockchain: "MATIC-AMOY",
+        status: "active",
+      });
+
+      const response = await request(app)
+        .get("/api/v1/wallets/me")
+        .set("Authorization", "Bearer valid-token");
+
+      expect(response.status).toBe(200);
+      expect(response.body.qr).toBeDefined();
+      expect(response.body.qr.qrCodeDataUrl).toMatch(/^data:image\/png;base64,/);
+      expect(response.body.qr.address).toBe("0x1234567890abcdef1234567890abcdef12345678");
+    });
   });
 
   describe("Circle Transaction Routes", () => {
@@ -146,6 +166,34 @@ describe("Circle & Crossmint Integration Tests", () => {
 
       expect(response.status).toBe(201);
       expect(response.body.transaction).toBeDefined();
+    });
+
+    test("POST /api/v1/transactions/circle-transfer rejects if wallet is not owned by user", async () => {
+      circleService.validateAddress.mockResolvedValue({ isValid: true });
+      Wallet.findOne.mockResolvedValue(null);
+
+      const response = await request(app)
+        .post("/api/v1/transactions/circle-transfer")
+        .set("Authorization", "Bearer valid-token")
+        .send({
+          walletId: "unowned-wallet-id",
+          destinationAddress: "0x1234567890abcdef1234567890abcdef12345678",
+          amount: 50.0,
+        });
+
+      expect(response.status).toBe(404);
+      expect(response.body.message).toMatch(/not found or you do not have permission/i);
+    });
+
+    test("GET /api/v1/transactions/circle/:circleTransactionId rejects if not owned by user", async () => {
+      Transaction.findOne.mockResolvedValue(null);
+
+      const response = await request(app)
+        .get("/api/v1/transactions/circle/circle-tx-999")
+        .set("Authorization", "Bearer valid-token");
+
+      expect(response.status).toBe(404);
+      expect(response.body.message).toMatch(/not found or you do not have permission/i);
     });
   });
 

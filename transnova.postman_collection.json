@@ -1,0 +1,858 @@
+{
+  "info": {
+    "_postman_id": "transnova-collection-v1",
+    "name": "Transnova API",
+    "description": "Complete API collection for the Transnova backend.\n\n## Setup\n1. Import this collection **and** the accompanying `transnova.postman_environment.json` environment file.\n2. Select the **Transnova Local** environment in the top-right dropdown.\n3. **Get a token** â€” run `[DEV] Firebase Signup` (first time) or `[DEV] Firebase Token` (existing user). The `idToken` is automatically saved to `{{firebaseToken}}`.\n4. **Sync your profile** â€” run `Auth / Sync Profile` to create the user document in MongoDB.\n5. Run any other endpoint â€” the `Authorization: Bearer {{firebaseToken}}` header is set on every protected request automatically.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{firebaseToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "ðŸ”§ Dev Helpers (non-production)",
+      "description": "Helper routes mounted at /api/v1/dev â€” only active when NODE_ENV != production.\nUse these to obtain Firebase ID tokens without a frontend.",
+      "item": [
+        {
+          "name": "[DEV] Firebase Signup",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.idToken) {",
+                  "  pm.environment.set('firebaseToken', res.idToken);",
+                  "  pm.environment.set('firebaseUid', res.uid);",
+                  "  console.log('firebaseToken saved to environment');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"testuser@example.com\",\n  \"password\": \"password123\",\n  \"displayName\": \"Test User\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/dev/firebase-signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "dev",
+                "firebase-signup"
+              ]
+            },
+            "description": "Registers a new Firebase user and returns an idToken.\nBody: { email, password, displayName? }\nThe test script automatically stores idToken as {{firebaseToken}}."
+          }
+        },
+        {
+          "name": "[DEV] Firebase Token (Sign In)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.idToken) {",
+                  "  pm.environment.set('firebaseToken', res.idToken);",
+                  "  pm.environment.set('firebaseUid', res.uid);",
+                  "  console.log('firebaseToken saved to environment');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"testuser@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/dev/firebase-token",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "dev",
+                "firebase-token"
+              ]
+            },
+            "description": "Signs in an existing Firebase user and returns a fresh idToken.\nBody: { email, password }\nThe test script automatically stores idToken as {{firebaseToken}}."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Returns { status: 'ok' } when the server is running."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "description": "Endpoints mounted at /api/v1/auth.\nAll require a Firebase ID token in the Authorization header.",
+      "item": [
+        {
+          "name": "Sync Profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.user && res.user._id) {",
+                  "  pm.environment.set('userId', res.user._id);",
+                  "  console.log('userId saved:', res.user._id);",
+                  "}",
+                  "if (res.wallet && res.wallet.id) {",
+                  "  pm.environment.set('circleWalletId', res.wallet.id);",
+                  "  console.log('circleWalletId saved:', res.wallet.id);",
+                  "}",
+                  "if (res.wallet && res.wallet.address) {",
+                  "  pm.environment.set('circleAddress', res.wallet.address);",
+                  "  console.log('circleAddress saved:', res.wallet.address);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"displayName\": \"Test User\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/sync",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "sync"
+              ]
+            },
+            "description": "Creates or updates the user document in MongoDB from the Firebase token claims.\nCall this once after sign-up before using any other protected endpoint.\nBody: { displayName? }"
+          }
+        },
+        {
+          "name": "Get My Profile",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "me"
+              ]
+            },
+            "description": "Returns the authenticated user's profile from MongoDB."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Wallets",
+      "description": "Endpoints mounted at /api/v1/wallets.",
+      "item": [
+        {
+          "name": "Create Circle Wallet",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.wallet && res.wallet.walletId) {",
+                  "  pm.environment.set('circleWalletId', res.wallet.walletId);",
+                  "  console.log('circleWalletId saved:', res.wallet.walletId);",
+                  "} else if (res.wallet && res.wallet._id) {",
+                  "  pm.environment.set('circleWalletId', res.wallet._id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"blockchain\": \"MATIC-AMOY\",\n  \"accountType\": \"SCA\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/wallets/circle",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "wallets",
+                "circle"
+              ]
+            },
+            "description": "Provisions a Circle developer-controlled wallet for the authenticated user.\nBody: { blockchain? (default: MATIC-AMOY), accountType? (default: SCA) }"
+          }
+        },
+        {
+          "name": "Get Wallet Balance",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/wallets/{{circleWalletId}}/balance",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "wallets",
+                "{{circleWalletId}}",
+                "balance"
+              ]
+            },
+            "description": "Returns the USDC token balance for the specified Circle wallet.\nPath param: walletId â€” stored in {{circleWalletId}} by the Create Circle Wallet request."
+          }
+        },
+        {
+          "name": "Validate Blockchain Address",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"address\": \"0xRecipientAddressHere\",\n  \"blockchain\": \"MATIC-AMOY\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/wallets/validate-address",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "wallets",
+                "validate-address"
+              ]
+            },
+            "description": "Validates a destination blockchain address via the Circle SDK.\nBody: { address (required), blockchain? (default: MATIC-AMOY) }"
+          }
+        },
+        {
+          "name": "Get My Wallet & QR",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.wallet && res.wallet.id) {",
+                  "  pm.environment.set('circleWalletId', res.wallet.id);",
+                  "}",
+                  "if (res.wallet && res.wallet.address) {",
+                  "  pm.environment.set('circleAddress', res.wallet.address);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/wallets/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "wallets",
+                "me"
+              ]
+            },
+            "description": "Returns the authenticated user active Circle wallet details along with the constant Base64 Data URL QR code."
+          }
+        },
+        {
+          "name": "Get Wallet QR Code",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/wallets/{{circleWalletId}}/qr",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "wallets",
+                "{{circleWalletId}}",
+                "qr"
+              ]
+            },
+            "description": "Generates and returns a permanent QR code Data URL for the given wallet address."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Transactions",
+      "description": "Endpoints mounted at /api/v1/transactions.",
+      "item": [
+        {
+          "name": "Estimate Transfer Fee",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"walletId\": \"{{circleWalletId}}\",\n  \"destinationAddress\": \"0xRecipientAddressHere\",\n  \"amount\": 10\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/transactions/estimate-fee",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "transactions",
+                "estimate-fee"
+              ]
+            },
+            "description": "Estimates the network fee for a Circle USDC transfer before executing.\nBody: { walletId (required), destinationAddress (required), amount (required, positive number) }"
+          }
+        },
+        {
+          "name": "Circle USDC Transfer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.transaction && res.transaction.circleTransactionId) {",
+                  "  pm.environment.set('circleTransactionId', res.transaction.circleTransactionId);",
+                  "  console.log('circleTransactionId saved:', res.transaction.circleTransactionId);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"walletId\": \"{{circleWalletId}}\",\n  \"destinationAddress\": \"0xRecipientAddressHere\",\n  \"amount\": 10\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/transactions/circle-transfer",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "transactions",
+                "circle-transfer"
+              ]
+            },
+            "description": "Executes a real Circle USDC transfer from the user's wallet.\nBody: { walletId (required), destinationAddress (required), amount (required, positive number) }"
+          }
+        },
+        {
+          "name": "Get Circle Transaction Status",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/transactions/circle/{{circleTransactionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "transactions",
+                "circle",
+                "{{circleTransactionId}}"
+              ]
+            },
+            "description": "Fetches the latest status of a Circle transaction and syncs local DB state.\nPath param: circleTransactionId â€” stored in {{circleTransactionId}} by the Circle Transfer request."
+          }
+        },
+        {
+          "name": "Simulate Transaction",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.transaction && res.transaction._id) {",
+                  "  pm.environment.set('transactionId', res.transaction._id);",
+                  "  console.log('transactionId saved:', res.transaction._id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"payin\",\n  \"amount\": 50,\n  \"asset\": \"USDC\",\n  \"destinationWalletAddress\": \"0xRecipientAddressHere\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/transactions/simulate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "transactions",
+                "simulate"
+              ]
+            },
+            "description": "Creates a simulated (no real money) transaction record in the database.\nBody: { type (payin | wallet_transfer | offramp), amount, asset? (default: USDC), destinationWalletAddress? }"
+          }
+        },
+        {
+          "name": "List My Transactions",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/transactions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "transactions"
+              ]
+            },
+            "description": "Returns all transactions for the authenticated user, sorted newest first."
+          }
+        }
+      ]
+    },
+    {
+      "description": "Endpoints mounted at /api/v1/onramp.\nPowered by the Transak integration.\n\nFlow:\n1. Create Widget URL -> open URL in browser to complete payment\n2. Transak calls the Webhook endpoint automatically on status changes\n3. Poll Get Transaction to check final status",
+      "name": "Onramp",
+      "item": [
+        {
+          "request": {
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "raw": "{{baseUrl}}/api/v1/onramp/widget-url",
+              "path": [
+                "api",
+                "v1",
+                "onramp",
+                "widget-url"
+              ]
+            },
+            "method": "POST",
+            "body": {
+              "raw": "{\n  \"walletId\": \"{{circleWalletId}}\",\n  \"fiatCurrency\": \"USD\",\n  \"fiatAmount\": 50\n}",
+              "mode": "raw"
+            },
+            "description": "Creates a pending on-ramp transaction and returns a Transak widget URL.\n\nPrerequisites:\n- User must have an active Circle USDC wallet (stored in {{circleWalletId}})\n- SERVER .env must have CLIENT_ORIGIN set (e.g. http://localhost:3000)\n- The Origin header must match CLIENT_ORIGIN exactly -- add {{clientOrigin}} env var\n\nBody: { walletId (required), fiatCurrency? (3-letter, default: USD), fiatAmount (required, positive, max 1000000) }\nResponse: { transaction: {...}, widgetUrl: 'https://...' }",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Origin",
+                "value": "{{clientOrigin}}"
+              }
+            ]
+          },
+          "name": "Create Onramp Widget URL",
+          "event": [
+            {
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.transaction && res.transaction._id) {",
+                  "  pm.environment.set('onrampTransactionId', res.transaction._id);",
+                  "  console.log('onrampTransactionId saved:', res.transaction._id);",
+                  "}",
+                  "if (res.widgetUrl) {",
+                  "  console.log('Open in browser:', res.widgetUrl);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              },
+              "listen": "test"
+            }
+          ]
+        },
+        {
+          "name": "Get Onramp Transaction",
+          "request": {
+            "method": "GET",
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "raw": "{{baseUrl}}/api/v1/onramp/transactions/{{onrampTransactionId}}",
+              "path": [
+                "api",
+                "v1",
+                "onramp",
+                "transactions",
+                "{{onrampTransactionId}}"
+              ]
+            },
+            "description": "Fetches the current status of an on-ramp transaction.\nPath param: transactionId -- auto-saved as {{onrampTransactionId}} by the Create Widget URL request.\n\nResponse: { transaction: { status, amount, sourceAmount, sourceCurrency, transakStatus, ... } }"
+          }
+        },
+        {
+          "name": "Transak Webhook (Simulate)",
+          "request": {
+            "body": {
+              "raw": "{\n  \"data\": \"<paste_transak_webhook_jwt_here>\"\n}",
+              "mode": "raw"
+            },
+            "description": "Receives Transak order status webhooks (no Firebase auth -- verified via HMAC JWT).\n\nIn production Transak calls this automatically. Use only for manual local simulation.\n\nStatus mappings (eventID -> app status):\n  ORDER_CREATED -> pending\n  ORDER_PAYMENT_VERIFYING -> processing\n  ORDER_PROCESSING -> processing\n  ORDER_COMPLETED -> completed\n  ORDER_FAILED -> failed\n  ORDER_REFUNDED -> cancelled\n  ORDER_EXPIRED -> cancelled",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "method": "POST",
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "raw": "{{baseUrl}}/api/v1/onramp/webhooks/transak",
+              "path": [
+                "api",
+                "v1",
+                "onramp",
+                "webhooks",
+                "transak"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Offramp",
+      "description": "Endpoints mounted at /api/v1/offramp.\nPowered by the Crossmint integration.",
+      "item": [
+        {
+          "name": "Create Payment Method (ACH Bank Account)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.paymentMethodId) {",
+                  "  pm.environment.set('paymentMethodId', res.paymentMethodId);",
+                  "  console.log('paymentMethodId saved:', res.paymentMethodId);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"ach\",\n  \"beneficiary\": {\n    \"name\": \"John Doe\",\n    \"email\": \"johndoe@example.com\",\n    \"address\": {\n      \"street1\": \"123 Main St\",\n      \"street2\": \"Apt 4B\",\n      \"city\": \"New York\",\n      \"state\": \"NY\",\n      \"postalCode\": \"10001\",\n      \"country\": \"US\"\n    }\n  },\n  \"bankAccount\": {\n    \"accountType\": \"checking\",\n    \"routingNumber\": \"021000021\",\n    \"accountNumber\": \"123456789\",\n    \"bankName\": \"Chase Bank\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/offramp/payment-methods",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "offramp",
+                "payment-methods"
+              ]
+            },
+            "description": "Creates a Crossmint off-ramp ACH payment method (US bank account).\nBody: { type?, beneficiary: { name, email, address: { street1, city, state, postalCode, country? } }, bankAccount: { accountType?, routingNumber, accountNumber, bankName? } }"
+          }
+        },
+        {
+          "name": "Create Offramp Order",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.orderId) {",
+                  "  pm.environment.set('offrampOrderId', res.orderId);",
+                  "  console.log('offrampOrderId saved:', res.orderId);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"payerAddress\": \"0xYourWalletAddressHere\",\n  \"paymentMethodId\": \"{{paymentMethodId}}\",\n  \"amount\": 25,\n  \"chain\": \"polygon-amoy\",\n  \"currency\": \"usdc\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/offramp/orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "offramp",
+                "orders"
+              ]
+            },
+            "description": "Creates a Crossmint off-ramp order to convert USDC to USD via ACH.\nBody: { payerAddress (required), paymentMethodId (required), amount (required, positive), chain? (default: polygon-amoy), currency? (default: usdc) }"
+          }
+        },
+        {
+          "name": "Get Offramp Order Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/offramp/orders/{{offrampOrderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "offramp",
+                "orders",
+                "{{offrampOrderId}}"
+              ]
+            },
+            "description": "Fetches Crossmint offramp order status by order ID (verifying payer ownership)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Remittance",
+      "description": "End-to-End Remittance Pipeline (Flow 1: Transak INR -> USDC -> Crossmint USD ACH).",
+      "item": [
+        {
+          "name": "Initiate Remittance (Flow 1)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.data && res.data.remittanceId) {",
+                  "  pm.environment.set('remittanceId', res.data.remittanceId);",
+                  "  console.log('remittanceId saved:', res.data.remittanceId);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fiatCurrency\": \"INR\",\n  \"fiatAmount\": 10000,\n  \"recipientPaymentMethodId\": \"{{paymentMethodId}}\",\n  \"paymentMethodType\": \"ach\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/remittance/initiate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "remittance",
+                "initiate"
+              ]
+            },
+            "description": "Initiates a cross-border remittance order, automatically provisioning the sender wallet and returning a signed Transak on-ramp URL."
+          }
+        },
+        {
+          "name": "Get Remittance Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/remittance/{{remittanceId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "remittance",
+                "{{remittanceId}}"
+              ]
+            },
+            "description": "Gets current status and lifecycle stage of a remittance order."
+          }
+        },
+        {
+          "name": "List My Remittances",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/remittance",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "remittance"
+              ]
+            },
+            "description": "Lists all remittances initiated by the authenticated user."
+          }
+        }
+      ]
+    }
+  ]
+}

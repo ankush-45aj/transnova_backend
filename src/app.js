@@ -11,6 +11,7 @@ const transactionRoutes = require("./modules/transactions/transaction.routes");
 const walletRoutes = require("./modules/wallets/wallet.routes");
 const offrampRoutes = require("./modules/offramp/offramp.routes");
 const onrampRoutes = require("./modules/onramp/onramp.routes");
+const remittanceRoutes = require("./modules/remittance/remittance.routes");
 const devTokenRoutes = require("./modules/auth/dev-token.routes");
 const razorpayRoutes = require("./modules/razorpay/razorpay.routes");
 
@@ -33,17 +34,30 @@ app.use("/api/v1/transactions", transactionRoutes);
 app.use("/api/v1/wallets", walletRoutes);
 app.use("/api/v1/offramp", offrampRoutes);
 app.use("/api/v1/onramp", onrampRoutes);
+<<<<<<< HEAD
 app.use("/api/razorpay", razorpayRoutes);
 app.use("/api/v1/razorpay", razorpayRoutes);
 // DEV ONLY — remove or comment out before production
 if (process.env.NODE_ENV !== "production") {
+=======
+app.use("/api/v1/remittance", remittanceRoutes);
+
+// DEV ONLY — strictly require both non-production NODE_ENV and explicit ENABLE_DEV_ROUTES flag
+if (process.env.NODE_ENV !== "production" && process.env.ENABLE_DEV_ROUTES === "true") {
+>>>>>>> 158bc4c740f89013c74a5e614c02ffd0ae8856c5
   app.use("/api/v1/dev", devTokenRoutes);
 }
 
+// Global sanitized error handler
 app.use((error, _request, response, _next) => {
   console.error("Unhandled error:", error.message || error);
   const status = error.statusCode || 500;
-  response.status(status).json({ message: error.message || "Internal server error" });
+  const isProd = process.env.NODE_ENV === "production";
+  const message = (status === 500 && isProd)
+    ? "Internal server error"
+    : (error.message || "Internal server error");
+
+  response.status(status).json({ message });
 });
 
 module.exports = app;
