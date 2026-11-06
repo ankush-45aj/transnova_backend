@@ -12,6 +12,7 @@ const walletRoutes = require("./modules/wallets/wallet.routes");
 const offrampRoutes = require("./modules/offramp/offramp.routes");
 const onrampRoutes = require("./modules/onramp/onramp.routes");
 const devTokenRoutes = require("./modules/auth/dev-token.routes");
+const razorpayRoutes = require("./modules/razorpay/razorpay.routes");
 
 const app = express();
 
@@ -20,6 +21,8 @@ if (environment.trustProxy) {
 }
 app.use(helmet());
 app.use(cors({ origin: environment.clientOrigin || false }));
+// Razorpay signs the exact request bytes, so parse this endpoint before JSON middleware.
+app.use(["/api/razorpay/webhook", "/api/v1/razorpay/webhook"], express.raw({ type: "application/json", limit: "100kb" }));
 app.use(express.json({ limit: "20kb" }));
 app.use(pinoHttp({ logger: pino({ level: process.env.LOG_LEVEL || "info" }) }));
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, limit: 300, standardHeaders: true, legacyHeaders: false }));
@@ -30,6 +33,8 @@ app.use("/api/v1/transactions", transactionRoutes);
 app.use("/api/v1/wallets", walletRoutes);
 app.use("/api/v1/offramp", offrampRoutes);
 app.use("/api/v1/onramp", onrampRoutes);
+app.use("/api/razorpay", razorpayRoutes);
+app.use("/api/v1/razorpay", razorpayRoutes);
 // DEV ONLY — remove or comment out before production
 if (process.env.NODE_ENV !== "production") {
   app.use("/api/v1/dev", devTokenRoutes);

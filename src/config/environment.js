@@ -24,6 +24,10 @@ const environment = {
   transakNetwork: process.env.TRANSAK_NETWORK,
   transakCircleBlockchain: process.env.TRANSAK_CIRCLE_BLOCKCHAIN,
   firebaseWebApiKey: process.env.FIREBASE_WEB_API_KEY,
+  razorpayKeyId: process.env.RAZORPAY_KEY_ID,
+  razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET,
+  razorpayWebhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET,
+  razorpayMode: process.env.RAZORPAY_MODE || "test",
 };
 
 module.exports = environment;
