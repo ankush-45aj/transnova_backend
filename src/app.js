@@ -34,17 +34,12 @@ app.use("/api/v1/transactions", transactionRoutes);
 app.use("/api/v1/wallets", walletRoutes);
 app.use("/api/v1/offramp", offrampRoutes);
 app.use("/api/v1/onramp", onrampRoutes);
-<<<<<<< HEAD
+app.use("/api/v1/remittance", remittanceRoutes);
 app.use("/api/razorpay", razorpayRoutes);
 app.use("/api/v1/razorpay", razorpayRoutes);
-// DEV ONLY — remove or comment out before production
-if (process.env.NODE_ENV !== "production") {
-=======
-app.use("/api/v1/remittance", remittanceRoutes);
 
 // DEV ONLY — strictly require both non-production NODE_ENV and explicit ENABLE_DEV_ROUTES flag
 if (process.env.NODE_ENV !== "production" && process.env.ENABLE_DEV_ROUTES === "true") {
->>>>>>> 158bc4c740f89013c74a5e614c02ffd0ae8856c5
   app.use("/api/v1/dev", devTokenRoutes);
 }
 
