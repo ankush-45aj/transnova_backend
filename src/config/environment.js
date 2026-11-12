@@ -16,6 +16,7 @@ const environment = {
   circleWalletSetId: process.env.CIRCLE_WALLET_SET_ID,
   crossmintApiKey: process.env.CROSSMINT_API_KEY,
   crossmintBaseUrl: process.env.CROSSMINT_BASE_URL || "https://staging.crossmint.com",
+  crossmintWebhookSecret: process.env.CROSSMINT_WEBHOOK_SECRET,
   transakApiKey: process.env.TRANSAK_API_KEY,
   transakApiSecret: process.env.TRANSAK_API_SECRET,
   transakBaseUrl: process.env.TRANSAK_BASE_URL || "https://api-stg.transak.com",
@@ -28,6 +29,12 @@ const environment = {
   razorpayKeySecret: process.env.RAZORPAY_KEY_SECRET,
   razorpayWebhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET,
   razorpayMode: process.env.RAZORPAY_MODE || "test",
+  // Phase 1 is deliberately sandbox-only. A future production release must
+  // explicitly replace this guard after compliance and settlement work lands.
+  paymentMode: process.env.PAYMENT_MODE || "sandbox",
+  sandboxBlockchain: process.env.SANDBOX_BLOCKCHAIN || "MATIC-AMOY",
+  requireIdempotencyKeys: process.env.REQUIRE_IDEMPOTENCY_KEYS !== "false" && process.env.NODE_ENV !== "test",
+  requireKycForMoneyMovement: process.env.REQUIRE_KYC_FOR_MONEY_MOVEMENT === "true" || process.env.NODE_ENV === "production",
 };
 
 module.exports = environment;

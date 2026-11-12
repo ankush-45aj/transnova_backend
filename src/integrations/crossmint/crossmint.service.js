@@ -58,7 +58,7 @@ class CrossmintService {
    * Create an off-ramp order.
    * POST /api/2022-06-09/orders
    */
-  async createOfframpOrder({ payment, recipient, lineItems }) {
+  async createOfframpOrder({ payment, recipient, lineItems, idempotencyKey }) {
     if (!payment || !recipient || !lineItems) {
       throw new Error("payment, recipient, and lineItems are required for offramp order creation.");
     }
@@ -71,6 +71,7 @@ class CrossmintService {
 
     const data = await crossmintRequest("/api/2022-06-09/orders", {
       method: "POST",
+      headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : undefined,
       body: JSON.stringify(payload),
     });
 

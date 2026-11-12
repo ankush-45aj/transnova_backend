@@ -4,6 +4,7 @@ const requireAuth = require("../../middlewares/require-auth");
 const User = require("../users/user.model");
 const Wallet = require("./wallet.model");
 const walletService = require("./wallet.service");
+const environment = require("../../config/environment");
 
 const router = express.Router();
 
@@ -78,6 +79,9 @@ router.get("/:walletId/qr", requireAuth, async (request, response, next) => {
 router.post("/circle", requireAuth, async (request, response, next) => {
   try {
     const input = createWalletSchema.parse(request.body || {});
+    if (input.blockchain.toUpperCase() !== environment.sandboxBlockchain.toUpperCase()) {
+      return response.status(400).json({ message: `Phase 1 supports ${environment.sandboxBlockchain} wallets only.` });
+    }
     const user = await User.findOne({ firebaseUid: request.auth.uid });
     if (!user) {
       return response.status(404).json({ message: "User profile not found. Call POST /auth/sync first." });
@@ -132,6 +136,9 @@ router.get("/:walletId/balance", requireAuth, async (request, response, next) =>
 router.post("/validate-address", requireAuth, async (request, response, next) => {
   try {
     const input = validateAddressSchema.parse(request.body);
+    if (input.blockchain.toUpperCase() !== environment.sandboxBlockchain.toUpperCase()) {
+      return response.status(400).json({ message: `Phase 1 supports ${environment.sandboxBlockchain} addresses only.` });
+    }
     const result = await walletService.validateAddress(input.address, input.blockchain);
     return response.status(200).json(result);
   } catch (error) {

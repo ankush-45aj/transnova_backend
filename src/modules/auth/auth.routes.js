@@ -4,6 +4,7 @@ const requireAuth = require("../../middlewares/require-auth");
 const User = require("../users/user.model");
 const Wallet = require("../wallets/wallet.model");
 const walletService = require("../wallets/wallet.service");
+const environment = require("../../config/environment");
 
 const router = express.Router();
 const profileSchema = z.object({ displayName: z.string().trim().max(100).optional() });
@@ -31,7 +32,7 @@ router.post("/sync", requireAuth, async (request, response, next) => {
     let wallet = null;
     let qr = null;
     try {
-      wallet = await walletService.createCircleWallet(user._id, { blockchain: "MATIC-AMOY" });
+      wallet = await walletService.createCircleWallet(user._id, { blockchain: environment.sandboxBlockchain });
       qr = await walletService.generateWalletQR(wallet);
     } catch (walletErr) {
       console.warn("Auto Circle wallet provisioning during sync deferred:", walletErr.message);

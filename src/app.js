@@ -14,6 +14,7 @@ const onrampRoutes = require("./modules/onramp/onramp.routes");
 const remittanceRoutes = require("./modules/remittance/remittance.routes");
 const devTokenRoutes = require("./modules/auth/dev-token.routes");
 const razorpayRoutes = require("./modules/razorpay/razorpay.routes");
+const userRoutes = require("./modules/users/user.routes");
 
 const app = express();
 
@@ -23,28 +24,33 @@ if (environment.trustProxy) {
 app.use(helmet());
 app.use(cors({ origin: environment.clientOrigin || false }));
 // Razorpay signs the exact request bytes, so parse this endpoint before JSON middleware.
-app.use(["/api/razorpay/webhook", "/api/v1/razorpay/webhook"], express.raw({ type: "application/json", limit: "100kb" }));
+app.use([
+  "/api/razorpay/webhook",
+  "/api/v1/razorpay/webhook",
+  "/api/v1/offramp/webhooks/crossmint",
+], express.raw({ type: "application/json", limit: "100kb" }));
 app.use(express.json({ limit: "20kb" }));
-app.use(pinoHttp({ logger: pino({ level: process.env.LOG_LEVEL || "info" }) }));
+app.use(pinoHttp({
+  logger: pino({
+    level: process.env.LOG_LEVEL || "info",
+    redact: ["req.headers.authorization", "req.headers.x-razorpay-signature", "req.headers.x-crossmint-signature"],
+  }),
+}));
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, limit: 300, standardHeaders: true, legacyHeaders: false }));
 
 app.get("/health", (_request, response) => response.status(200).json({ status: "ok" }));
 app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/transactions", transactionRoutes);
 app.use("/api/v1/wallets", walletRoutes);
 app.use("/api/v1/offramp", offrampRoutes);
 app.use("/api/v1/onramp", onrampRoutes);
-<<<<<<< HEAD
 app.use("/api/razorpay", razorpayRoutes);
 app.use("/api/v1/razorpay", razorpayRoutes);
-// DEV ONLY — remove or comment out before production
-if (process.env.NODE_ENV !== "production") {
-=======
 app.use("/api/v1/remittance", remittanceRoutes);
 
 // DEV ONLY — strictly require both non-production NODE_ENV and explicit ENABLE_DEV_ROUTES flag
 if (process.env.NODE_ENV !== "production" && process.env.ENABLE_DEV_ROUTES === "true") {
->>>>>>> 158bc4c740f89013c74a5e614c02ffd0ae8856c5
   app.use("/api/v1/dev", devTokenRoutes);
 }
 

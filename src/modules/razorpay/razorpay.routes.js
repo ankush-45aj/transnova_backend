@@ -24,12 +24,21 @@ router.post("/create-order", requireAuth, async (request, response, next) => {
     const input = amountSchema.parse(request.body);
     const user = await getUser(request.auth.uid);
     if (!user) return response.status(404).json({ message: "User profile not found. Call POST /auth/sync first." });
-    const payment = await paymentService.createOrder({ user, amount: input.amount });
+    const idempotencyKey = request.get("idempotency-key") || undefined;
+    const payment = await paymentService.createOrder({ user, amount: input.amount, ...(idempotencyKey ? { idempotencyKey } : {}) });
     return response.status(201).json({
       keyId: environment.razorpayKeyId,
       orderId: payment.razorpayOrderId,
       amount: payment.amount,
       currency: payment.currency,
+      checkout: {
+        key: environment.razorpayKeyId,
+        orderId: payment.razorpayOrderId,
+        amount: payment.amount,
+        currency: payment.currency,
+        name: "TransNova",
+        description: "Domestic test payment",
+      },
       payment,
     });
   } catch (error) { if (error instanceof z.ZodError) error.statusCode = 400; return next(error); }
@@ -72,6 +81,28 @@ const getPayment = async (request, response, next) => {
 
 router.get("/payment", requireAuth, getPayment);
 router.get("/payment/:orderId", requireAuth, getPayment);
+
+router.get("/payment/:orderId/receipt", requireAuth, async (request, response, next) => {
+  try {
+    const user = await getUser(request.auth.uid);
+    if (!user) return response.status(404).json({ message: "User profile not found." });
+    const payment = await RazorpayPayment.findOne({ razorpayOrderId: request.params.orderId, user: user._id });
+    if (!payment) return response.status(404).json({ message: "Payment not found." });
+    return response.status(200).json({
+      receipt: {
+        orderId: payment.razorpayOrderId,
+        paymentId: payment.razorpayPaymentId || null,
+        status: payment.status,
+        amountPaise: payment.amount,
+        amountInr: Number(payment.amount) / 100,
+        currency: payment.currency,
+        signatureVerified: payment.signatureVerified,
+        createdAt: payment.createdAt,
+        updatedAt: payment.updatedAt,
+      },
+    });
+  } catch (error) { return next(error); }
+});
 
 router.get("/history", requireAuth, async (request, response, next) => {
   try {

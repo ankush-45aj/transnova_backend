@@ -7,8 +7,18 @@ const assertRazorpayConfiguration = () => {
     throw error;
   }
 
-  if (environment.razorpayMode !== "test") {
-    const error = new Error("Only Razorpay test mode is enabled by this application.");
+  if (!["test", "live"].includes(environment.razorpayMode)) {
+    const error = new Error("RAZORPAY_MODE must be either test or live.");
+    error.statusCode = 503;
+    throw error;
+  }
+  if (environment.paymentMode === "sandbox" && environment.razorpayMode !== "test") {
+    const error = new Error("Phase 1 supports Razorpay test mode only.");
+    error.statusCode = 503;
+    throw error;
+  }
+  if (process.env.NODE_ENV === "production" && environment.razorpayMode !== "live") {
+    const error = new Error("Razorpay production use requires RAZORPAY_MODE=live.");
     error.statusCode = 503;
     throw error;
   }

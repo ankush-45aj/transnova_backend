@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const Transaction = require("./transaction.model");
 const Wallet = require("../wallets/wallet.model");
 const circleService = require("../../integrations/circle/circle.service");
+const environment = require("../../config/environment");
 
 class TransactionService {
   /**
@@ -74,9 +75,19 @@ class TransactionService {
   /**
    * Execute Circle USDC transfer.
    */
-  async executeCircleTransfer({ walletId, destinationAddress, amount, userId }) {
+  async executeCircleTransfer({ walletId, destinationAddress, amount, userId, idempotencyKey }) {
     if (!amount || Number(amount) <= 0) {
       const error = new Error("Transfer amount must be greater than zero.");
+      error.statusCode = 400;
+      throw error;
+    }
+
+    if (idempotencyKey) {
+      const existing = await Transaction.findOne({ user: userId, type: "wallet_transfer", idempotencyKey });
+      if (existing) return existing;
+    }
+    if (environment.requireIdempotencyKeys && !idempotencyKey) {
+      const error = new Error("Idempotency-Key is required for a transfer.");
       error.statusCode = 400;
       throw error;
     }
@@ -105,10 +116,17 @@ class TransactionService {
         user: userId,
       });
     }
-
     if (!wallet) {
       const error = new Error("Wallet not found or you do not have permission to access it.");
       error.statusCode = 404;
+      throw error;
+    }
+    // Existing sandbox records created before this guard may have no explicit
+    // chain field. New wallets always persist it; when present it must be Amoy.
+    if ((wallet.blockchain || wallet.network)
+      && String(wallet.blockchain || wallet.network).toUpperCase() !== environment.sandboxBlockchain.toUpperCase()) {
+      const error = new Error(`Phase 1 supports ${environment.sandboxBlockchain} transfers only.`);
+      error.statusCode = 400;
       throw error;
     }
 
@@ -155,7 +173,12 @@ class TransactionService {
       usdcAmount: String(amount),
       destinationCurrency: "USDC",
       destinationAmount: String(amount),
-      metadata: { destinationAddress },
+      idempotencyKey,
+      metadata: {
+        sourceAddress: wallet.circleAddress || wallet.address,
+        destinationAddress,
+        network: wallet.blockchain || wallet.network,
+      },
     });
 
     try {

@@ -7,7 +7,9 @@
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "test": "jest --runInBand",
-    "test:e2e": "jest src/e2e.test.js --runInBand"
+    "test:e2e": "jest src/e2e.test.js --runInBand",
+    "check": "node scripts/check-project.js",
+    "audit:prod": "npm audit --omit=dev --audit-level=high"
   },
   "keywords": [],
   "author": "",
@@ -24,11 +26,8 @@
     "mongoose": "^9.10.3",
     "pino": "^10.3.1",
     "pino-http": "^11.0.0",
-<<<<<<< HEAD
-    "razorpay": "^2.9.6",
-=======
     "qrcode": "^1.5.4",
->>>>>>> 158bc4c740f89013c74a5e614c02ffd0ae8856c5
+    "razorpay": "^2.9.6",
     "zod": "^4.6.5"
   },
   "devDependencies": {

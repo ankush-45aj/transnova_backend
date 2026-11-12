@@ -101,6 +101,7 @@ router.post("/circle-transfer", requireAuth, async (request, response, next) => 
       destinationAddress: targetAddress,
       amount: input.amount,
       userId: user._id,
+      idempotencyKey: request.get("idempotency-key") || undefined,
     });
 
     return response.status(201).json({
@@ -111,6 +112,37 @@ router.post("/circle-transfer", requireAuth, async (request, response, next) => 
     if (error instanceof z.ZodError) error.statusCode = 400;
     return next(error);
   }
+});
+
+/**
+ * GET /api/v1/transactions/:transactionId/receipt
+ * Returns a compact, Flutter-friendly receipt for a transaction owned by the caller.
+ */
+router.get("/:transactionId/receipt", requireAuth, async (request, response, next) => {
+  try {
+    const user = await User.findOne({ firebaseUid: request.auth.uid });
+    if (!user) return response.status(404).json({ message: "User profile not found." });
+    const transaction = await Transaction.findOne({ _id: request.params.transactionId, user: user._id });
+    if (!transaction) return response.status(404).json({ message: "Transaction not found." });
+    return response.status(200).json({
+      receipt: {
+        transactionId: transaction._id,
+        reference: transaction.reference,
+        type: transaction.type,
+        status: transaction.status,
+        asset: transaction.asset,
+        amount: transaction.amount,
+        senderWalletAddress: transaction.metadata?.sourceAddress,
+        destinationAddress: transaction.metadata?.destinationAddress,
+        network: transaction.metadata?.network,
+        provider: transaction.provider,
+        providerTransactionId: transaction.providerTransactionId,
+        transactionHash: transaction.circleTxHash,
+        createdAt: transaction.createdAt,
+        updatedAt: transaction.updatedAt,
+      },
+    });
+  } catch (error) { return next(error); }
 });
 
 /**
