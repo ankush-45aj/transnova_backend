@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const RazorpayPayment = require("./razorpay-payment.model");
 const razorpay = require("../../integrations/razorpay/razorpay.service");
+const environment = require("../../config/environment");
 
 const toPaise = (amount) => Math.round(Number(amount) * 100);
 const statusForPayment = (payment) => {
@@ -10,12 +11,22 @@ const statusForPayment = (payment) => {
 };
 
 class RazorpayPaymentService {
-  async createOrder({ user, amount }) {
+  async createOrder({ user, amount, idempotencyKey }) {
+    if (environment.requireIdempotencyKeys && !idempotencyKey) {
+      const error = new Error("Idempotency-Key is required for a payment order.");
+      error.statusCode = 400;
+      throw error;
+    }
+    if (idempotencyKey) {
+      const existing = await RazorpayPayment.findOne({ user: user._id, idempotencyKey });
+      if (existing) return existing;
+    }
     const amountPaise = toPaise(amount);
     const receipt = `tn_rzp_${crypto.randomUUID().replaceAll("-", "")}`;
     const order = await razorpay.createOrder({
       amountPaise,
       receipt,
+      idempotencyKey,
       notes: { userId: String(user._id), firebaseUid: user.firebaseUid },
     });
     return RazorpayPayment.create({

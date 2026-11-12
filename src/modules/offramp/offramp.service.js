@@ -3,6 +3,7 @@ const Transaction = require("../transactions/transaction.model");
 const Wallet = require("../wallets/wallet.model");
 const PaymentMethod = require("./payment-method.model");
 const crossmintService = require("../../integrations/crossmint/crossmint.service");
+const environment = require("../../config/environment");
 
 class OfframpService {
   /**
@@ -60,7 +61,7 @@ class OfframpService {
   /**
    * Create Crossmint off-ramp order and record transaction in application database.
    */
-  async createOfframpOrder({ payerAddress, paymentMethodId, amount, user, chain = "polygon-amoy", currency = "usdc" }) {
+  async createOfframpOrder({ payerAddress, paymentMethodId, amount, user, chain = "polygon-amoy", currency = "usdc", idempotencyKey }) {
     if (!amount || Number(amount) <= 0) {
       const error = new Error("Off-ramp amount must be greater than zero.");
       error.statusCode = 400;
@@ -70,6 +71,12 @@ class OfframpService {
     if (!payerAddress || !paymentMethodId) {
       const error = new Error("payerAddress and paymentMethodId are required.");
       error.statusCode = 400;
+      throw error;
+    }
+
+    if (environment.requireKycForMoneyMovement && user.kycStatus !== "verified") {
+      const error = new Error("A verified KYC profile is required for an off-ramp order.");
+      error.statusCode = 403;
       throw error;
     }
 
@@ -129,6 +136,7 @@ class OfframpService {
       payment,
       recipient,
       lineItems,
+      idempotencyKey,
     });
 
     // Map Crossmint order status to application transaction status
@@ -162,6 +170,7 @@ class OfframpService {
         chain,
         payerAddress,
         requiresKyc: orderResult.requiresKyc,
+        idempotencyKey,
       },
     });
 

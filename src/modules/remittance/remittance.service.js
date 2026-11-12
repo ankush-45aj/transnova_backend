@@ -6,6 +6,7 @@ const PaymentMethod = require("../offramp/payment-method.model");
 const onrampService = require("../onramp/onramp.service");
 const transactionService = require("../transactions/transaction.service");
 const offrampService = require("../offramp/offramp.service");
+const environment = require("../../config/environment");
 
 class RemittanceService {
   /**
@@ -33,6 +34,11 @@ class RemittanceService {
     if (!user) {
       const error = new Error("User profile not found.");
       error.statusCode = 404;
+      throw error;
+    }
+    if (environment.requireKycForMoneyMovement && user.kycStatus !== "verified") {
+      const error = new Error("A verified KYC profile is required to initiate a remittance.");
+      error.statusCode = 403;
       throw error;
     }
 
@@ -123,31 +129,28 @@ class RemittanceService {
   async onOnrampCompleted(onrampTransaction) {
     if (!onrampTransaction.remittanceId) return;
 
-    const remittance = await Remittance.findById(onrampTransaction.remittanceId);
-    if (!remittance || remittance.status === "completed" || remittance.status === "failed") {
+    const remittance = await Remittance.findOneAndUpdate(
+      { _id: onrampTransaction.remittanceId, status: "onramp_pending" },
+      {
+        $set: { status: "offramp_pending", usdcAmount: onrampTransaction.usdcAmount || onrampTransaction.amount },
+        $push: {
+          timeline: {
+            stage: "onramp",
+            status: "completed",
+            details: { usdcReceived: String(onrampTransaction.usdcAmount || onrampTransaction.amount), transakOrderId: onrampTransaction.transakOrderId },
+          },
+        },
+      },
+      { new: true }
+    );
+    if (!remittance) {
       return;
     }
 
     const usdcReceived = onrampTransaction.usdcAmount || onrampTransaction.amount;
-    remittance.usdcAmount = usdcReceived;
-    remittance.status = "onramp_completed";
-    remittance.timeline.push({
-      stage: "onramp",
-      status: "completed",
-      details: { usdcReceived: String(usdcReceived), transakOrderId: onrampTransaction.transakOrderId },
-    });
-    await remittance.save();
 
     // Trigger off-ramp leg
     try {
-      remittance.status = "offramp_pending";
-      remittance.timeline.push({
-        stage: "offramp",
-        status: "pending",
-        details: { message: "Initiating Crossmint off-ramp to recipient bank account" },
-      });
-      await remittance.save();
-
       const user = await User.findById(remittance.user);
       const wallet = await Wallet.findById(remittance.senderWallet);
       const payerAddress = wallet?.circleAddress || wallet?.address;
@@ -163,6 +166,7 @@ class RemittanceService {
         user,
         chain: "polygon-amoy",
         currency: "usdc",
+        idempotencyKey: remittance.reference,
       });
 
       remittance.offrampTransaction = offrampResult.transaction?._id;

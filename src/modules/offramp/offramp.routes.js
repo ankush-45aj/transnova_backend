@@ -3,6 +3,8 @@ const { z } = require("zod");
 const requireAuth = require("../../middlewares/require-auth");
 const User = require("../users/user.model");
 const offrampService = require("./offramp.service");
+const { verifyWebhookSignature } = require("../../integrations/crossmint/crossmint.client");
+const crypto = require("crypto");
 
 const router = express.Router();
 
@@ -104,6 +106,7 @@ router.post("/orders", requireAuth, async (request, response, next) => {
       user,
       chain: input.chain,
       currency: input.currency,
+      idempotencyKey: request.get("idempotency-key") || undefined,
     });
 
     return response.status(201).json({
@@ -141,7 +144,12 @@ router.get("/orders/:orderId", requireAuth, async (request, response, next) => {
  */
 router.post("/webhooks/crossmint", async (request, response, next) => {
   try {
-    const payload = request.body;
+    const rawBody = request.body;
+    if (!Buffer.isBuffer(rawBody)
+      || !verifyWebhookSignature({ rawBody, signature: request.get("x-crossmint-signature") })) {
+      return response.status(401).json({ message: "Invalid Crossmint webhook signature." });
+    }
+    const payload = JSON.parse(rawBody.toString("utf8"));
     const orderId = payload?.orderId || payload?.id || payload?.data?.orderId;
     const status = payload?.status || payload?.data?.status;
 
@@ -150,15 +158,25 @@ router.post("/webhooks/crossmint", async (request, response, next) => {
     }
 
     const Transaction = require("../transactions/transaction.model");
-    const transaction = await Transaction.findOne({ crossmintOrderId: orderId });
-    if (transaction) {
-      transaction.crossmintStatus = status;
-      if (status === "completed" || status === "success") {
-        transaction.status = "completed";
-      } else if (status === "failed" || status === "rejected") {
-        transaction.status = "failed";
-      }
-      await transaction.save();
+    const Remittance = require("../remittance/remittance.model");
+    const eventId = request.get("x-crossmint-event-id") || crypto.createHash("sha256").update(rawBody).digest("hex");
+    const transaction = await Transaction.findOneAndUpdate(
+      { crossmintOrderId: orderId, processedWebhookEvents: { $ne: eventId } },
+      { $addToSet: { processedWebhookEvents: eventId } },
+      { new: true }
+    );
+    if (!transaction) return response.status(200).json({ received: true, duplicate: true });
+
+    transaction.crossmintStatus = status;
+    if (status === "completed" || status === "success") transaction.status = "completed";
+    else if (status === "failed" || status === "rejected") transaction.status = "failed";
+    await transaction.save();
+
+    if (transaction.status === "completed") {
+      await Remittance.updateOne(
+        { offrampTransaction: transaction._id, status: "offramp_pending" },
+        { $set: { status: "completed" }, $push: { timeline: { stage: "offramp", status: "completed", details: { crossmintOrderId: orderId, source: "webhook" } } } }
+      );
     }
 
     return response.status(200).json({ received: true });

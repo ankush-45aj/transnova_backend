@@ -9,6 +9,9 @@ const transactionSchema = new mongoose.Schema(
     amount: { type: mongoose.Schema.Types.Decimal128, required: true },
     status: { type: String, enum: ["created", "pending", "processing", "completed", "failed", "cancelled", "simulated"], default: "created" },
     isSimulation: { type: Boolean, default: false, index: true },
+    // Client-supplied idempotency key. Reusing the same key for the same operation
+    // must return the original transaction instead of sending funds twice.
+    idempotencyKey: { type: String, trim: true, sparse: true },
     remittanceId: { type: mongoose.Schema.Types.ObjectId, ref: "Remittance", sparse: true, index: true },
     processedWebhookEvents: [{ type: String }],
     sourceWallet: { type: mongoose.Schema.Types.ObjectId, ref: "Wallet" },
@@ -34,5 +37,7 @@ const transactionSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+transactionSchema.index({ user: 1, type: 1, idempotencyKey: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model("Transaction", transactionSchema);

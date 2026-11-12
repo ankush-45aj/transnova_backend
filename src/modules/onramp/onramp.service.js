@@ -3,6 +3,7 @@ const net = require("net");
 const environment = require("../../config/environment");
 const Transaction = require("../transactions/transaction.model");
 const Wallet = require("../wallets/wallet.model");
+const User = require("../users/user.model");
 const transakService = require("../../integrations/transak/transak.service");
 
 const webhookStatus = {
@@ -24,6 +25,15 @@ class OnrampService {
     }
 
     transakService.assertConfigured();
+
+    if (environment.requireKycForMoneyMovement) {
+      const user = await User.findById(userId);
+      if (!user || user.kycStatus !== "verified") {
+        const error = new Error("A verified KYC profile is required to start an on-ramp.");
+        error.statusCode = 403;
+        throw error;
+      }
+    }
 
     if (!environment.transakCircleBlockchain) {
       const error = new Error("Transak Circle blockchain configuration is required.");

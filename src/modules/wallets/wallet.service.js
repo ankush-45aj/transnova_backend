@@ -3,6 +3,7 @@ const QRCode = require("qrcode");
 const User = require("../users/user.model");
 const Wallet = require("./wallet.model");
 const circleService = require("../../integrations/circle/circle.service");
+const environment = require("../../config/environment");
 
 class WalletService {
   /**
@@ -17,7 +18,12 @@ class WalletService {
     }
 
     // Check if user already has an active Circle wallet on this blockchain
-    const blockchain = options.blockchains?.[0] || options.blockchain || "MATIC-AMOY";
+    const blockchain = options.blockchains?.[0] || options.blockchain || environment.sandboxBlockchain;
+    if (blockchain.toUpperCase() !== environment.sandboxBlockchain.toUpperCase()) {
+      const error = new Error(`Phase 1 supports ${environment.sandboxBlockchain} wallets only.`);
+      error.statusCode = 400;
+      throw error;
+    }
     const existingWallet = await Wallet.findOne({
       user: userId,
       provider: "circle",
@@ -25,7 +31,9 @@ class WalletService {
       status: "active",
     });
 
-    if (existingWallet && !options.forceNew) {
+    // A stable wallet is essential for QR payments. A caller cannot silently
+    // create a second active wallet for the same user and blockchain.
+    if (existingWallet) {
       return existingWallet;
     }
 
@@ -63,7 +71,9 @@ class WalletService {
     }
 
     const qrPayload = address;
-    const paymentUri = `ethereum:${address}@80002?symbol=USDC`;
+    const chainIds = { "MATIC-AMOY": 80002, "POLYGON": 137, "MATIC": 137 };
+    const chainId = chainIds[String(wallet.blockchain || wallet.network || "").toUpperCase()];
+    const paymentUri = chainId ? `ethereum:${address}@${chainId}?symbol=USDC` : address;
     const qrCodeDataUrl = await QRCode.toDataURL(qrPayload, {
       errorCorrectionLevel: "H",
       margin: 2,
@@ -99,7 +109,7 @@ class WalletService {
     if (!wallet) {
       // Auto-provision if not yet created
       try {
-        wallet = await this.createCircleWallet(userId, { blockchain: "MATIC-AMOY" });
+        wallet = await this.createCircleWallet(userId, { blockchain: environment.sandboxBlockchain });
       } catch (err) {
         console.warn("Could not auto-provision wallet in getUserPrimaryWallet:", err.message);
       }
@@ -175,7 +185,7 @@ class WalletService {
   /**
    * Validate a destination blockchain address.
    */
-  async validateAddress(address, blockchain = "MATIC-AMOY") {
+  async validateAddress(address, blockchain = environment.sandboxBlockchain) {
     if (!address) {
       const error = new Error("Destination address is required.");
       error.statusCode = 400;

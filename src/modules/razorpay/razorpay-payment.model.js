@@ -7,6 +7,7 @@ const razorpayPaymentSchema = new mongoose.Schema({
   razorpayOrderId: { type: String, required: true, unique: true, index: true },
   razorpayPaymentId: { type: String, unique: true, sparse: true, index: true },
   receipt: { type: String, required: true, unique: true, index: true },
+  idempotencyKey: { type: String, trim: true, sparse: true },
   amount: { type: Number, required: true, min: 1 }, // smallest INR unit (paise)
   currency: { type: String, required: true, default: "INR", enum: ["INR"] },
   status: { type: String, enum: ["created", "authorized", "captured", "failed"], default: "created", index: true },
@@ -17,5 +18,6 @@ const razorpayPaymentSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 razorpayPaymentSchema.index({ user: 1, createdAt: -1 });
+razorpayPaymentSchema.index({ user: 1, idempotencyKey: 1 }, { unique: true, sparse: true });
 
 module.exports = mongoose.model("RazorpayPayment", razorpayPaymentSchema);

@@ -1,4 +1,19 @@
 const environment = require("../../config/environment");
+const crypto = require("crypto");
+
+const safeEqual = (actual, expected) => {
+  const actualBuffer = Buffer.from(actual || "");
+  const expectedBuffer = Buffer.from(expected || "");
+  return actualBuffer.length === expectedBuffer.length && crypto.timingSafeEqual(actualBuffer, expectedBuffer);
+};
+
+// Crossmint webhook verification is intentionally fail-closed. The provider (or
+// a verified webhook relay) must send HMAC-SHA256(raw body) in this header.
+const verifyWebhookSignature = ({ rawBody, signature }) => {
+  if (!environment.crossmintWebhookSecret || !Buffer.isBuffer(rawBody)) return false;
+  const expected = crypto.createHmac("sha256", environment.crossmintWebhookSecret).update(rawBody).digest("hex");
+  return safeEqual(signature, expected);
+};
 
 /**
  * Crossmint HTTP client wrapper.
@@ -34,4 +49,5 @@ const crossmintRequest = async (endpoint, options = {}) => {
 
 module.exports = {
   crossmintRequest,
+  verifyWebhookSignature,
 };

@@ -17,6 +17,9 @@ const circleService = require("./integrations/circle/circle.service");
 const crossmintService = require("./integrations/crossmint/crossmint.service");
 const transakService = require("./integrations/transak/transak.service");
 
+// QR rendering can be slow on constrained CI workers.
+jest.setTimeout(15000);
+
 // Mock Firebase authentication to simulate User A and User B
 jest.mock("./config/firebase", () => ({
   admin: {

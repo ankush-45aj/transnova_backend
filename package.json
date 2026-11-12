@@ -7,7 +7,9 @@
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "test": "jest --runInBand",
-    "test:e2e": "jest src/e2e.test.js --runInBand"
+    "test:e2e": "jest src/e2e.test.js --runInBand",
+    "check": "node scripts/check-project.js",
+    "audit:prod": "npm audit --omit=dev --audit-level=high"
   },
   "keywords": [],
   "author": "",

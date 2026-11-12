@@ -2,6 +2,8 @@
 
 Secure, compliant cross-border remittance backend connecting local fiat payments (INR via UPI/IMPS) with stablecoin rails (USDC on Polygon) and US domestic banking payouts (ACH/FedNow).
 
+Razorpay is a separate domestic INR/UPI payment module. It does not fund, trigger, or settle crypto remittances; its routes are under `/api/v1/razorpay` (with legacy `/api/razorpay` aliases).
+
 ---
 
 ## 1. End-to-End Remittance Flow
@@ -86,6 +88,10 @@ npm test
 # 4. Start development server
 npm run dev
 ```
+
+For a complete local, sandbox, and production verification checklist, see [docs/TESTING.md](docs/TESTING.md). Do not use production credentials or real customer funds until the compliance and provider-webhook checks in that guide are complete.
+
+The Phase 1 Flutter endpoint contract and request examples are in [docs/FLUTTER_API.md](docs/FLUTTER_API.md). This repository is currently locked to sandbox/test payments.
 
 ---
 
