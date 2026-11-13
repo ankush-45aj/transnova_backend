@@ -28,6 +28,13 @@ const assertProductionConfiguration = () => {
   if (environment.razorpayMode !== "live") throw new Error("Production configuration requires RAZORPAY_MODE=live.");
 };
 
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("Unhandled Rejection at:", promise, "reason:", reason);
+});
+process.on("uncaughtException", (error) => {
+  console.error("Uncaught Exception:", error);
+});
+
 const startServer = async () => {
   assertPhaseOneSandboxConfiguration();
   assertProductionConfiguration();
