@@ -18,6 +18,14 @@ const razorpayPaymentSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 razorpayPaymentSchema.index({ user: 1, createdAt: -1 });
-razorpayPaymentSchema.index({ user: 1, idempotencyKey: 1 }, { unique: true, sparse: true });
+razorpayPaymentSchema.index(
+  { user: 1, idempotencyKey: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      idempotencyKey: { $type: "string" },
+    },
+  }
+);
 
 module.exports = mongoose.model("RazorpayPayment", razorpayPaymentSchema);

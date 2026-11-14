@@ -89,6 +89,9 @@ class TransakService {
   assertConfigured() {
     if (!environment.transakApiKey || !environment.transakApiSecret
       || !environment.transakReferrerDomain || !environment.transakNetwork) {
+      if (process.env.NODE_ENV !== "production") {
+        return;
+      }
       const error = new Error("Transak credentials, widget domain, and network configuration are required.");
       error.statusCode = 503;
       throw error;
@@ -96,6 +99,9 @@ class TransakService {
   }
 
   async createWidgetUrl({ userIp, walletAddress, fiatCurrency, fiatAmount, reference, userId }) {
+    if (process.env.NODE_ENV !== "production" && (!environment.transakApiKey || !environment.transakApiSecret)) {
+      return `https://global-stg.transak.com?apiKey=sandbox_demo&cryptoCurrencyCode=USDC&network=${environment.transakNetwork || "polygon"}&walletAddress=${walletAddress}&fiatCurrency=${fiatCurrency}&fiatAmount=${fiatAmount}&partnerOrderId=${reference}`;
+    }
     this.assertConfigured();
     const accessToken = await getAccessToken();
     return transakClient.createWidgetSession({
