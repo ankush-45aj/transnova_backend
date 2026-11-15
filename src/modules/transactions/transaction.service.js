@@ -6,6 +6,68 @@ const circleService = require("../../integrations/circle/circle.service");
 const environment = require("../../config/environment");
 
 class TransactionService {
+  async executeDemoTransfer({ walletId, destinationAddress, amount, userId, idempotencyKey }) {
+    if (!environment.demoMoneyMode) {
+      const error = new Error("Demo money mode is disabled.");
+      error.statusCode = 403;
+      throw error;
+    }
+    if (idempotencyKey) {
+      const existing = await Transaction.findOne({ user: userId, type: "wallet_transfer", idempotencyKey });
+      if (existing) return existing;
+    }
+
+    const walletSelector = mongoose.Types.ObjectId.isValid(walletId)
+      ? { _id: walletId }
+      : { $or: [{ circleWalletId: walletId }, { providerWalletId: walletId }, { circleAddress: walletId }, { address: walletId }] };
+    const sourceWallet = await Wallet.findOne({ ...walletSelector, user: userId, provider: "circle", status: "active" });
+    if (!sourceWallet) {
+      const error = new Error("Wallet not found or you do not have permission to access it.");
+      error.statusCode = 404;
+      throw error;
+    }
+    const destinationWallet = await Wallet.findOne({
+      $or: [{ circleAddress: destinationAddress }, { address: destinationAddress }],
+      provider: "circle",
+      status: "active",
+    });
+    if (!destinationWallet) {
+      const error = new Error("Recipient wallet was not found.");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const debited = await Wallet.findOneAndUpdate(
+      { _id: sourceWallet._id, availableBalance: { $gte: amount } },
+      { $inc: { availableBalance: -amount } },
+      { returnDocument: "after" }
+    );
+    if (!debited) {
+      const error = new Error("Insufficient demo USDC balance.");
+      error.statusCode = 400;
+      throw error;
+    }
+    await Wallet.updateOne({ _id: destinationWallet._id }, { $inc: { availableBalance: amount } });
+    return Transaction.create({
+      reference: `tn_demo_transfer_${crypto.randomUUID()}`,
+      user: userId,
+      type: "wallet_transfer",
+      asset: "USDC",
+      amount: String(amount),
+      status: "simulated",
+      isSimulation: true,
+      sourceWallet: sourceWallet._id,
+      destinationWallet: destinationWallet._id,
+      provider: "sandbox-ledger",
+      idempotencyKey,
+      sourceCurrency: "USDC",
+      sourceAmount: String(amount),
+      destinationCurrency: "USDC",
+      destinationAmount: String(amount),
+      metadata: { simulation: true, sourceAddress: sourceWallet.circleAddress || sourceWallet.address, destinationAddress },
+    });
+  }
+
   /**
    * Estimate transfer fee for Circle USDC transfer.
    */
@@ -61,7 +123,7 @@ class TransactionService {
       walletId: targetCircleWalletId,
       tokenId,
       destinationAddress,
-      amounts: [amount],
+      amount: [amount],
     });
 
     return {

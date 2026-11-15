@@ -33,6 +33,9 @@ const environment = {
   // explicitly replace this guard after compliance and settlement work lands.
   paymentMode: process.env.PAYMENT_MODE || "sandbox",
   sandboxBlockchain: process.env.SANDBOX_BLOCKCHAIN || "MATIC-AMOY",
+  // A local/demo ledger for frontend testing only. It never submits a Circle
+  // transaction and is forcibly disabled outside non-production environments.
+  demoMoneyMode: process.env.DEMO_MONEY_MODE === "true" && process.env.NODE_ENV !== "production",
   requireIdempotencyKeys: process.env.REQUIRE_IDEMPOTENCY_KEYS !== "false" && process.env.NODE_ENV !== "test",
   requireKycForMoneyMovement: process.env.REQUIRE_KYC_FOR_MONEY_MOVEMENT === "true" || process.env.NODE_ENV === "production",
 };

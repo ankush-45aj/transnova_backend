@@ -122,6 +122,27 @@ router.get("/:walletId/balance", requireAuth, async (request, response, next) =>
       return response.status(404).json({ message: "User profile not found. Call POST /auth/sync first." });
     }
 
+    if (environment.demoMoneyMode) {
+      const wallet = await Wallet.findOne({
+        $or: [
+          { _id: request.params.walletId },
+          { circleWalletId: request.params.walletId },
+          { providerWalletId: request.params.walletId },
+          { address: request.params.walletId },
+          { circleAddress: request.params.walletId },
+        ],
+        user: user._id,
+        status: "active",
+      });
+      if (!wallet) return response.status(404).json({ message: "Wallet not found or you do not have permission to view its balance." });
+      return response.status(200).json({
+        walletId: wallet.circleWalletId || wallet.providerWalletId || wallet._id,
+        balances: [{ token: { symbol: "USDC", id: "demo-usdc" }, amount: String(wallet.availableBalance || 0) }],
+        provider: "sandbox-ledger",
+        simulated: true,
+      });
+    }
+
     const balanceData = await walletService.getWalletBalance(request.params.walletId, user._id);
     return response.status(200).json(balanceData);
   } catch (error) {

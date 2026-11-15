@@ -93,6 +93,8 @@ For a complete local, sandbox, and production verification checklist, see [docs/
 
 The Phase 1 Flutter endpoint contract and request examples are in [docs/FLUTTER_API.md](docs/FLUTTER_API.md). This repository is currently locked to sandbox/test payments.
 
+For a Render staging deployment and provider-sandbox verification, see [docs/RENDER_STAGING.md](docs/RENDER_STAGING.md). The complete frontend endpoint handoff is in [docs/FLUTTER_ENDPOINTS.md](docs/FLUTTER_ENDPOINTS.md).
+
 ---
 
 ## 5. Regulatory & Compliance Framework

@@ -6,6 +6,7 @@ const User = require("../users/user.model");
 const Wallet = require("../wallets/wallet.model");
 const Transaction = require("./transaction.model");
 const transactionService = require("./transaction.service");
+const environment = require("../../config/environment");
 
 const router = express.Router();
 
@@ -96,16 +97,19 @@ router.post("/circle-transfer", requireAuth, async (request, response, next) => 
       targetAddress = recipientWallet.circleAddress || recipientWallet.address;
     }
 
-    const transaction = await transactionService.executeCircleTransfer({
+    const transferInput = {
       walletId: input.walletId,
       destinationAddress: targetAddress,
       amount: input.amount,
       userId: user._id,
       idempotencyKey: request.get("idempotency-key") || undefined,
-    });
+    };
+    const transaction = environment.demoMoneyMode
+      ? await transactionService.executeDemoTransfer(transferInput)
+      : await transactionService.executeCircleTransfer(transferInput);
 
     return response.status(201).json({
-      message: "Circle USDC transfer initiated.",
+      message: environment.demoMoneyMode ? "Simulated USDC transfer completed in the sandbox ledger." : "Circle USDC transfer initiated.",
       transaction,
     });
   } catch (error) {

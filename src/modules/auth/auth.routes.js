@@ -16,11 +16,15 @@ const profileSchema = z.object({ displayName: z.string().trim().max(100).optiona
 router.post("/sync", requireAuth, async (request, response, next) => {
   try {
     const body = profileSchema.parse(request.body);
+    const email = typeof request.auth.email === "string" ? request.auth.email.trim().toLowerCase() : "";
+    if (!email) {
+      return response.status(400).json({ message: "The Firebase account must include an email address to create a profile." });
+    }
     const user = await User.findOneAndUpdate(
       { firebaseUid: request.auth.uid },
       {
         $set: {
-          email: request.auth.email || "",
+          email,
           displayName: body.displayName ?? request.auth.name ?? "",
           phoneNumber: request.auth.phone_number,
         },

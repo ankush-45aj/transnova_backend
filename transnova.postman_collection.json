@@ -778,9 +778,9 @@
                 "type": "text/javascript",
                 "exec": [
                   "const res = pm.response.json();",
-                  "if (res.data && res.data.remittanceId) {",
-                  "  pm.environment.set('remittanceId', res.data.remittanceId);",
-                  "  console.log('remittanceId saved:', res.data.remittanceId);",
+                  "if (res.remittance && res.remittance._id) {",
+                  "  pm.environment.set('remittanceId', res.remittance._id);",
+                  "  console.log('remittanceId saved:', res.remittance._id);",
                   "}"
                 ]
               }
@@ -796,7 +796,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"fiatCurrency\": \"INR\",\n  \"fiatAmount\": 10000,\n  \"recipientPaymentMethodId\": \"{{paymentMethodId}}\",\n  \"paymentMethodType\": \"ach\"\n}"
+              "raw": "{\n  \"walletId\": \"{{circleWalletId}}\",\n  \"senderCurrency\": \"INR\",\n  \"senderAmount\": 10000,\n  \"recipientCurrency\": \"USD\",\n  \"recipientPaymentMethodId\": \"{{paymentMethodId}}\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/v1/remittance/initiate",

@@ -7,9 +7,49 @@
  */
 
 const express = require("express");
+const { z } = require("zod");
 const environment = require("../../config/environment");
+const requireAuth = require("../../middlewares/require-auth");
+const User = require("../users/user.model");
+const Wallet = require("../wallets/wallet.model");
+const Transaction = require("../transactions/transaction.model");
+const crypto = require("crypto");
 
 const router = express.Router();
+const demoFundSchema = z.object({ walletId: z.string().trim().min(1), amount: z.coerce.number().positive().max(1000000) });
+
+// Explicit development-only funding for the sandbox ledger. This endpoint is
+// mounted only when ENABLE_DEV_ROUTES=true and never calls a payment provider.
+router.post("/demo/fund", requireAuth, async (request, response, next) => {
+  try {
+    if (!environment.demoMoneyMode) return response.status(403).json({ message: "DEMO_MONEY_MODE=true is required." });
+    const input = demoFundSchema.parse(request.body);
+    const user = await User.findOne({ firebaseUid: request.auth.uid });
+    if (!user) return response.status(404).json({ message: "User profile not found. Call POST /auth/sync first." });
+    const wallet = await Wallet.findOneAndUpdate(
+      { _id: input.walletId, user: user._id, provider: "circle", status: "active" },
+      { $inc: { availableBalance: input.amount } },
+      { returnDocument: "after" }
+    );
+    if (!wallet) return response.status(404).json({ message: "Wallet not found or not owned by user." });
+    const transaction = await Transaction.create({
+      reference: `tn_demo_fund_${crypto.randomUUID()}`,
+      user: user._id,
+      type: "payin",
+      asset: "USDC",
+      amount: String(input.amount),
+      status: "simulated",
+      isSimulation: true,
+      destinationWallet: wallet._id,
+      provider: "sandbox-ledger",
+      metadata: { simulation: true, reason: "developer demo funding" },
+    });
+    return response.status(201).json({ message: "Demo USDC funded. No real money or stablecoin was created.", walletId: wallet._id, availableBalance: String(wallet.availableBalance), transaction });
+  } catch (error) {
+    if (error instanceof z.ZodError) error.statusCode = 400;
+    return next(error);
+  }
+});
 
 /**
  * POST /api/v1/dev/firebase-signup

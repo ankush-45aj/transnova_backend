@@ -61,7 +61,10 @@ class CircleService {
   async getWalletTokenBalance(walletId) {
     const client = getCircleClient();
     const response = await client.getWalletTokenBalance({
-      walletId,
+      // The Circle SDK names this required path parameter `id`, not `walletId`.
+      // Supplying `walletId` is silently ignored by the SDK and prevents every
+      // balance-dependent action (fee estimates and transfers) from running.
+      id: walletId,
       includeAll: true,
     });
     return response.data?.tokenBalances || response.tokenBalances || response.data || [];
@@ -82,7 +85,9 @@ class CircleService {
       }
     }
 
-    throw new Error(`Internal USDC token ID not found in Circle wallet balances for wallet ${walletId}.`);
+    const error = new Error("No USDC balance is available in this wallet. Fund the sandbox wallet before estimating or sending a transfer.");
+    error.statusCode = 400;
+    throw error;
   }
 
   /**
@@ -105,14 +110,15 @@ class CircleService {
   /**
    * Estimate transfer fee.
    */
-  async estimateTransferFee({ walletId, tokenId, destinationAddress, amounts }) {
+  async estimateTransferFee({ walletId, tokenId, destinationAddress, amount }) {
     const client = getCircleClient();
-    const amountArray = Array.isArray(amounts) ? amounts.map(String) : [String(amounts)];
+    const amountArray = Array.isArray(amount) ? amount.map(String) : [String(amount)];
     const response = await client.estimateTransferFee({
       walletId,
       tokenId,
       destinationAddress,
-      amounts: amountArray,
+      // The installed Circle SDK expects `amount` (singular).
+      amount: amountArray,
     });
     return response.data || response;
   }

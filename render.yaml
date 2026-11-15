@@ -1,0 +1,58 @@
+services:
+  - type: web
+    name: transnova-backend-staging
+    runtime: node
+    plan: starter
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      # This application intentionally refuses real-money production mode.
+      - key: NODE_ENV
+        value: staging
+      - key: PAYMENT_MODE
+        value: sandbox
+      - key: RAZORPAY_MODE
+        value: test
+      - key: SANDBOX_BLOCKCHAIN
+        value: MATIC-AMOY
+      - key: REQUIRE_KYC_FOR_MONEY_MOVEMENT
+        value: "false"
+      # Do not expose local testing helpers on a public Render service.
+      - key: ENABLE_DEV_ROUTES
+        value: "false"
+      - key: DEMO_MONEY_MODE
+        value: "false"
+      - key: MONGO_URI
+        sync: false
+      - key: CLIENT_ORIGIN
+        sync: false
+      - key: FIREBASE_SERVICE_ACCOUNT_JSON
+        sync: false
+      - key: CIRCLE_API_KEY
+        sync: false
+      - key: CIRCLE_ENTITY_SECRET
+        sync: false
+      - key: CIRCLE_WALLET_SET_ID
+        sync: false
+      - key: CROSSMINT_API_KEY
+        sync: false
+      - key: CROSSMINT_WEBHOOK_SECRET
+        sync: false
+      - key: TRANSAK_API_KEY
+        sync: false
+      - key: TRANSAK_API_SECRET
+        sync: false
+      - key: TRANSAK_REFERRER_DOMAIN
+        sync: false
+      - key: TRANSAK_NETWORK
+        value: polygon
+      - key: TRANSAK_CIRCLE_BLOCKCHAIN
+        value: MATIC-AMOY
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false

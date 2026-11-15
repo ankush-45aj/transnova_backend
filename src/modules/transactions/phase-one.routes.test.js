@@ -6,17 +6,35 @@ jest.mock("../../config/firebase", () => ({
 }));
 jest.mock("../users/user.model", () => ({ findOne: jest.fn() }));
 jest.mock("./transaction.model", () => ({ findOne: jest.fn() }));
-jest.mock("./transaction.service", () => ({ executeCircleTransfer: jest.fn() }));
+jest.mock("./transaction.service", () => ({ executeCircleTransfer: jest.fn(), executeDemoTransfer: jest.fn() }));
 
 const app = require("../../app");
 const User = require("../users/user.model");
 const transactionService = require("./transaction.service");
 const Transaction = require("./transaction.model");
+const environment = require("../../config/environment");
 
 describe("Phase 1 crypto API contract", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    environment.demoMoneyMode = false;
     User.findOne.mockResolvedValue({ _id: "sender-id" });
+  });
+
+  test("uses the explicit sandbox ledger only when demo money mode is enabled", async () => {
+    environment.demoMoneyMode = true;
+    transactionService.executeDemoTransfer.mockResolvedValue({ _id: "demo-tx-1", status: "simulated", isSimulation: true });
+
+    const response = await request(app).post("/api/v1/transactions/circle-transfer")
+      .set("Authorization", "Bearer token")
+      .set("Idempotency-Key", "demo-key")
+      .send({ walletId: "wallet-1", destinationAddress: "0x1111111111111111111111111111111111111111", amount: 1 });
+
+    expect(response.status).toBe(201);
+    expect(response.body.transaction.isSimulation).toBe(true);
+    expect(response.body.message).toContain("Simulated");
+    expect(transactionService.executeDemoTransfer).toHaveBeenCalledWith(expect.objectContaining({ idempotencyKey: "demo-key" }));
+    expect(transactionService.executeCircleTransfer).not.toHaveBeenCalled();
   });
 
   test("forwards the Flutter idempotency key when starting a transfer", async () => {
